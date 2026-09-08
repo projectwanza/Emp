@@ -1,6 +1,6 @@
 {
-  "name": "AR Connect",
-  "short_name": "AR Connect",
+  "name": "Emp Connect",
+  "short_name": "Emp Connect",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
