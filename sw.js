@@ -1,4 +1,4 @@
-const CACHE_NAME = "ar-connect-cache-v1";
+const CACHE_NAME = "emp-connect-cache-v1";
 const urlsToCache = [
   "/",
   "/index.html",
