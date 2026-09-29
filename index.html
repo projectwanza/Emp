@@ -1,36 +1,2467 @@
-<!-- GitHub Pages index.html -->
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AR Connect</title>
-  <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#000000">
-  <link rel="apple-touch-icon" href="icon-192.png">
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Employee Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- NEW: Shop View map - Leaflet (free, no API key) + marker clustering -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { height: 100%; overflow: hidden; }
-    iframe {
-      width: 100vw;
-      height: 100%;
-      min-height: 100dvh;
-      border: none;
-      display: block;
+    :root{
+      --primary:#101828; --primary-accent:#2952e3; --primary-light:#eef2ff;
+      --success:#16a34a; --success-bg:#ecfdf3;
+      --danger:#dc2626; --danger-bg:#fef2f2;
+      --warning:#d97706; --warning-bg:#fffbeb;
+      --neutral-bg:#f6f7fb; --card-bg:#ffffff;
+      --text-1:#101828; --text-2:#475467; --text-3:#98a2b3;
+      --border:#e4e7ec;
+      --radius:14px; --radius-sm:9px;
+      --shadow-sm:0 1px 2px rgba(16,24,40,.05);
+      --shadow-md:0 4px 12px rgba(16,24,40,.08);
+      --shadow-lg:0 12px 32px rgba(16,24,40,.14);
+    }
+    *{box-sizing:border-box;}
+    body{margin:0;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:var(--neutral-bg);color:var(--text-1);}
+    button{font-family:inherit;cursor:pointer;}
+    input,select,textarea{font-family:inherit;}
+    .hidden{display:none !important;}
+
+    #loginScreen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;
+      background:linear-gradient(135deg,#0b1220 0%,#111827 60%,#1f2937 100%);}
+    .login-card{width:100%;max-width:380px;background:#fff;border-radius:18px;box-shadow:var(--shadow-lg);padding:34px 30px;}
+    .login-card h1{font-size:20px;margin:0 0 4px;}
+    .login-card p.sub{color:var(--text-2);font-size:13px;margin:0 0 22px;}
+    .badge-emp{display:inline-block;background:#2952e3;color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;margin-bottom:14px;letter-spacing:.03em;}
+    .field{margin-bottom:14px;}
+    .field label{display:block;font-size:13px;font-weight:600;color:var(--text-2);margin-bottom:6px;}
+    .field input,.field select,.field textarea{width:100%;padding:11px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:14px;}
+    .field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--primary-accent);}
+    .btn{border:none;border-radius:var(--radius-sm);padding:11px 16px;font-weight:600;font-size:13.5px;}
+    .btn-primary{background:var(--primary);color:#fff;width:100%;}
+    .btn-primary:hover{background:#000;}
+    .btn-secondary{background:var(--primary-light);color:var(--primary-accent);}
+    .btn-ghost{background:transparent;border:1.5px solid var(--border);color:var(--text-2);}
+    .btn-danger{background:var(--danger-bg);color:var(--danger);}
+    .btn-success{background:var(--success-bg);color:var(--success);}
+    .btn:disabled{opacity:.6;cursor:not-allowed;}
+    .login-error{background:var(--danger-bg);color:var(--danger);padding:9px 13px;border-radius:var(--radius-sm);font-size:13px;margin-bottom:14px;}
+
+    #appShell{display:none;min-height:100vh;}
+    .topbar{position:sticky;top:0;z-index:20;background:#111827;color:#fff;display:flex;align-items:center;justify-content:space-between;padding:12px 20px;}
+    .topbar span.title{font-weight:700;font-size:15px;}
+    .topbar .badge-emp{margin:0 0 0 8px;}
+    .topbar-right{display:flex;gap:10px;align-items:center;}
+    .topbar-right button{background:rgba(255,255,255,.1);color:#fff;border:none;padding:8px 14px;border-radius:8px;font-size:12.5px;}
+
+    .tabs{display:flex;gap:4px;padding:14px 20px 0;max-width:900px;margin:0 auto;overflow-x:auto;}
+    .tab-btn{padding:10px 16px;border:none;background:transparent;border-radius:10px 10px 0 0;font-size:13.5px;font-weight:600;color:var(--text-2);white-space:nowrap;}
+    .tab-btn.active{background:#fff;color:var(--primary-accent);box-shadow:var(--shadow-sm);}
+
+    .main{max-width:900px;margin:0 auto;padding:20px;}
+    .page-header{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:10px;margin-bottom:18px;}
+    .page-header h2{margin:0 0 4px;font-size:20px;}
+    .page-header p{margin:0;color:var(--text-2);font-size:13px;}
+
+    .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:22px;}
+    .stat-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow-sm);}
+    .stat-card .label{font-size:11px;color:var(--text-3);font-weight:700;text-transform:uppercase;margin-bottom:6px;}
+    .stat-card .value{font-size:21px;font-weight:800;}
+
+    .card{background:#fff;border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow-sm);}
+    .card-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
+    .card-header h3{margin:0;font-size:14.5px;}
+    .card-body{padding:16px 18px;}
+
+    .attendance-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:20px;box-shadow:var(--shadow-sm);text-align:center;}
+    .attendance-card .att-status{font-size:13px;color:var(--text-2);margin-bottom:14px;}
+    .attendance-card .att-timer{font-size:28px;font-weight:800;margin-bottom:14px;font-variant-numeric:tabular-nums;}
+    .attendance-card .btn{padding:13px 24px;font-size:14px;min-width:160px;}
+
+    .att-day-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:10px;overflow:hidden;}
+    .att-day-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px;cursor:pointer;font-weight:700;font-size:13.5px;}
+    .att-day-total{color:var(--primary-accent);}
+    .att-day-chevron{font-size:11px;color:var(--text-3);}
+    .att-day-sub{padding:0 16px 10px;margin-top:-10px;font-size:12px;color:var(--text-3);}
+    .att-day-body{max-height:0;overflow:hidden;transition:max-height .25s ease;border-top:1px solid transparent;}
+    .att-day-card .att-day-body:not([style*="max-height: 0"]){border-top:1px solid var(--border);}
+    .att-shift-row{display:flex;justify-content:space-between;gap:10px;padding:10px 16px;font-size:13px;border-bottom:1px solid var(--border);}
+    .att-shift-row:last-child{border-bottom:none;}
+    .att-shift-label{color:var(--text-2);font-weight:600;min-width:60px;}
+    .att-shift-dur{font-weight:700;}
+    .att-shift-total{background:var(--neutral-bg);font-weight:800;}
+
+    .filters-bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
+    .filters-bar input{padding:9px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:13px;flex:1;min-width:180px;}
+    /* NEW: My Customers ON/OFF toggle */
+    .mc-toggle{position:relative;display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-size:11.5px;font-weight:700;letter-spacing:.4px;color:var(--text-2);user-select:none;}
+    .mc-toggle input{position:absolute;opacity:0;width:0;height:0;}
+    .mc-slider{position:relative;width:38px;height:22px;background:#cfd4dc;border-radius:22px;transition:background .2s;flex-shrink:0;}
+    .mc-slider::after{content:'';position:absolute;top:3px;left:3px;width:16px;height:16px;background:#fff;border-radius:50%;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.25);}
+    .mc-toggle input:checked + .mc-slider{background:var(--primary-accent);}
+    .mc-toggle input:checked + .mc-slider::after{transform:translateX(16px);}
+    /* NEW: Assigned Leads table + Lead details */
+    .lead-note-cell{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;color:var(--text-2);}
+    .lead-link{cursor:pointer;color:var(--primary-accent);font-weight:600;}
+    /* NEW: clickable Lead Status + compact dropdown */
+    .lead-status{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;border:1px solid var(--border);background:var(--neutral-bg);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;}
+    .lead-status:hover{border-color:var(--primary-accent);color:var(--primary-accent);}
+    .lead-status.saving{opacity:.7;pointer-events:none;}
+    .lead-status-menu{position:fixed;z-index:9999;background:#fff;border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow-lg);padding:4px;min-width:170px;max-height:calc(100vh - 16px);overflow-y:auto;}
+    .lead-status-menu button{display:block;width:100%;text-align:left;background:transparent;border:none;padding:7px 12px;font-size:13px;border-radius:6px;cursor:pointer;color:inherit;}
+    .lead-status-menu button:hover{background:var(--neutral-bg);}
+    .lead-status-menu button.current{background:var(--primary-light);color:var(--primary-accent);font-weight:700;}
+    .lead-timeline{border-left:2px solid var(--border);margin-left:6px;padding-left:16px;}
+    .lead-timeline .lt-item{position:relative;margin-bottom:16px;}
+    .lead-timeline .lt-item::before{content:'';position:absolute;left:-23px;top:4px;width:10px;height:10px;border-radius:50%;background:var(--primary-accent);}
+    .lead-timeline .lt-time{font-size:11.5px;color:var(--text-3);font-weight:700;margin-bottom:2px;}
+    .lead-timeline .lt-text{font-size:13.5px;white-space:pre-wrap;word-break:break-word;}
+    /* NEW: activity-type badge + dot colour in the Lead timeline */
+    .lead-timeline .lt-tag{display:inline-block;font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:999px;margin:1px 0 3px;background:var(--primary-light);color:var(--primary-accent);}
+    .lead-timeline .lt-item.t-call::before{background:var(--success);}
+    .lead-timeline .lt-item.t-call .lt-tag{background:var(--success-bg);color:var(--success);}
+    .lead-timeline .lt-item.t-status::before,.lead-timeline .lt-item.t-edit::before{background:var(--warning);}
+    .lead-timeline .lt-item.t-status .lt-tag,.lead-timeline .lt-item.t-edit .lt-tag{background:var(--warning-bg);color:var(--warning);}
+    .lead-timeline .lt-item.t-convert::before,.lead-timeline .lt-item.t-create::before{background:var(--success);}
+    .lead-timeline .lt-item.t-convert .lt-tag,.lead-timeline .lt-item.t-create .lt-tag{background:var(--success-bg);color:var(--success);}
+    .lead-timeline .lt-item.t-remove::before{background:var(--danger);}
+    .lead-timeline .lt-item.t-remove .lt-tag{background:var(--danger-bg);color:var(--danger);}
+    .profile-grid .span2{grid-column:1 / -1;}
+    /* NEW: Convert Lead modal + Converted History */
+    .conv-type-row{display:flex;gap:16px;margin-bottom:14px;}
+    .conv-type-row label{display:flex;align-items:center;gap:6px;font-size:13.5px;font-weight:600;cursor:pointer;}
+    .conv-cust-list{max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;}
+    .conv-cust-row{padding:9px 12px;border-bottom:1px solid var(--border);cursor:pointer;}
+    .conv-cust-row:last-child{border-bottom:none;}
+    .conv-cust-row:hover{background:var(--neutral-bg);}
+    .conv-cust-row.selected{background:var(--primary-light);}
+    .conv-cust-row .ccr-name{font-weight:700;font-size:13.5px;}
+    .conv-cust-row .ccr-sub{font-size:11.5px;color:var(--text-2);}
+    .conv-badge{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;background:#fdf2d8;color:#8a5a00;font-size:10.5px;font-weight:700;}
+    .conv-history-card{border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;}
+    .conv-history-card:last-child{margin-bottom:0;}
+
+    table{width:100%;border-collapse:collapse;font-size:13px;}
+    thead th{text-align:left;padding:10px 12px;color:var(--text-3);font-weight:700;text-transform:uppercase;font-size:10.5px;border-bottom:1px solid var(--border);white-space:nowrap;}
+    tbody td{padding:11px 12px;border-bottom:1px solid var(--border);white-space:nowrap;}
+    .table-scroll{overflow-x:auto;}
+    tbody tr:hover{background:var(--neutral-bg);}
+    .orders-mobile-cards{display:none;}
+    .customers-mobile-cards{display:none;}
+    @media(max-width:640px){
+      #ordersList table{display:none;}
+      .orders-mobile-cards{display:block;}
+      .order-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:10px;box-shadow:var(--shadow-sm);}
+      .order-card .oc-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+      .order-card .oc-title{font-weight:700;font-size:14px;}
+      .order-card .oc-row{display:flex;justify-content:space-between;font-size:12.5px;color:var(--text-2);margin-bottom:4px;}
+      .order-card .oc-actions{display:flex;gap:8px;margin-top:10px;}
+      .order-card .oc-actions .icon-btn{flex:1;text-align:center;}
+      #mcList table{display:none;}
+      .customers-mobile-cards{display:block;}
+      .customer-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:10px;box-shadow:var(--shadow-sm);}
+      .customer-card .cc-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;cursor:pointer;}
+      .customer-card .cc-title{font-weight:700;font-size:14px;}
+      .customer-card .cc-row{display:flex;justify-content:space-between;font-size:12.5px;color:var(--text-2);margin-bottom:4px;}
+      .customer-card .cc-actions{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;}
+      .customer-card .cc-actions .icon-btn{flex:1;min-width:60px;text-align:center;}
+    }
+    tbody tr.clickable{cursor:pointer;}
+
+    .icon-btn{border:1px solid var(--border);background:#fff;border-radius:7px;padding:6px 10px;font-size:13px;}
+    .icon-btn.add-visit{color:var(--primary-accent);font-weight:800;}
+
+    .badge{display:inline-flex;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700;}
+    .badge-active{background:var(--success-bg);color:var(--success);}
+    .badge-inactive{background:var(--danger-bg);color:var(--danger);}
+
+    .empty-state{text-align:center;padding:40px;color:var(--text-3);font-size:13px;}
+    .skeleton{background:linear-gradient(90deg,#eef0f3 25%,#e4e7ec 37%,#eef0f3 63%);background-size:400% 100%;animation:sk 1.4s ease infinite;border-radius:8px;height:40px;margin-bottom:8px;}
+    @keyframes sk{0%{background-position:100% 50%}100%{background-position:0 50%}}
+
+    .modal-overlay{position:fixed;inset:0;background:rgba(16,24,40,.5);z-index:100;display:flex;align-items:center;justify-content:center;padding:16px;}
+    .modal{background:#fff;width:100%;max-width:460px;border-radius:16px;box-shadow:var(--shadow-lg);max-height:90vh;display:flex;flex-direction:column;overflow:hidden;}
+    .modal.modal-wide{max-width:720px;}
+    .modal-head{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex:0 0 auto;}
+    .modal-head h3{margin:0;font-size:15px;}
+    .modal-close{border:none;background:var(--neutral-bg);width:28px;height:28px;border-radius:50%;}
+    .modal-body{padding:18px 20px;flex:1 1 auto;overflow-y:auto;min-height:0;}
+    .modal-actions{display:flex;gap:10px;padding:14px 20px;flex:0 0 auto;border-top:1px solid var(--border);}
+
+    .profile-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:14px;}
+    .profile-item{background:var(--neutral-bg);border-radius:var(--radius-sm);padding:10px 14px;}
+    .profile-item .k{font-size:10.5px;color:var(--text-3);font-weight:700;text-transform:uppercase;margin-bottom:4px;}
+    .profile-item .v{font-size:14px;font-weight:600;word-break:break-word;}
+    .back-link{background:transparent;border:none;color:var(--primary-accent);font-weight:600;font-size:13px;padding:0;margin-bottom:14px;cursor:pointer;}
+    .section-gap{margin-top:20px;}
+    .duplicate-warning{background:var(--warning-bg);color:var(--warning);padding:10px 13px;border-radius:var(--radius-sm);font-size:13px;margin-bottom:14px;}
+
+    #toastHost{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:200;display:flex;flex-direction:column;gap:8px;align-items:center;}
+    .toast{background:#101828;color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;box-shadow:var(--shadow-lg);}
+    .toast.err{background:var(--danger);}
+    .toast.ok{background:var(--success);}
+
+    @media(max-width:760px){
+      .stat-grid{grid-template-columns:repeat(2,1fr);}
+      .main{padding:14px;}
+      .profile-grid{grid-template-columns:1fr;}
+    }
+
+    /* NEW: Shop View map */
+    .shopview-map-wrap{position:relative;width:100%;height:70vh;min-height:420px;border-radius:var(--radius);overflow:hidden;border:1px solid var(--border);box-shadow:var(--shadow-sm);background:#eef0f3;}
+    .shopview-map{width:100%;height:100%;}
+    .shopview-map-wrap:fullscreen{height:100vh;border-radius:0;}
+    .shopview-map-wrap:-webkit-full-screen{height:100vh;border-radius:0;}
+    .sv-controls{position:absolute;top:12px;right:12px;z-index:500;display:flex;flex-direction:column;gap:8px;}
+    .sv-ctrl-btn{background:#fff;border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 12px;font-size:12.5px;font-weight:700;box-shadow:var(--shadow-md);white-space:nowrap;}
+    .sv-ctrl-btn:hover{background:var(--primary-light);color:var(--primary-accent);}
+    .sv-legend{position:absolute;bottom:12px;left:12px;z-index:500;background:#fff;border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 12px;font-size:11.5px;font-weight:600;color:var(--text-2);box-shadow:var(--shadow-sm);display:flex;gap:12px;}
+    .sv-loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--text-3);background:#f6f7fb;z-index:400;}
+    .sv-shop-icon{font-size:20px;line-height:1;text-align:center;filter:drop-shadow(0 1px 2px rgba(0,0,0,.35));}
+    .sv-me-icon{font-size:24px;line-height:1;text-align:center;filter:drop-shadow(0 2px 3px rgba(0,0,0,.45));}
+    .sv-popup{font-family:'Inter',sans-serif;min-width:210px;}
+    .sv-popup-title{font-weight:800;font-size:14px;margin-bottom:6px;color:var(--primary);}
+    .sv-popup-row{display:flex;justify-content:space-between;gap:10px;font-size:12px;padding:3px 0;border-bottom:1px dashed var(--border);}
+    .sv-popup-row .k{color:var(--text-3);font-weight:700;text-transform:uppercase;font-size:9.5px;}
+    .sv-popup-row .v{color:var(--text-1);font-weight:600;text-align:right;}
+    .sv-popup-actions{display:flex;gap:6px;margin-top:10px;}
+    .sv-popup-actions .btn{padding:7px 8px;font-size:11.5px;}
+    .marker-cluster-small,.marker-cluster-medium,.marker-cluster-large{background:rgba(41,82,227,.25);}
+    .marker-cluster-small div,.marker-cluster-medium div,.marker-cluster-large div{background:var(--primary-accent);color:#fff;font-weight:700;}
+    @media(max-width:640px){
+      .shopview-map-wrap{height:60vh;min-height:360px;}
+      .sv-controls{top:8px;right:8px;gap:6px;}
+      .sv-ctrl-btn{padding:7px 9px;font-size:11.5px;}
     }
   </style>
 </head>
 <body>
-  <iframe 
-    src="https://projectwanza.github.io/CRM/employee"
-    allow="*"
-    allowfullscreen>
-  </iframe>
 
-  <script>
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("sw.js");
+  <div id="loginScreen">
+    <div class="login-card">
+      <div class="badge-emp">EMPLOYEE PORTAL</div>
+      <h1>Employee Sign In</h1>
+      <p class="sub">Log in with the ID your admin gave you.</p>
+      <div id="loginError" class="login-error hidden"></div>
+      <div class="field"><label>Employee ID / Username</label><input type="text" id="empUser" autocomplete="username"></div>
+      <div class="field"><label>Password</label><input type="password" id="empPass" autocomplete="current-password"></div>
+      <button class="btn btn-primary" id="empLoginBtn" onclick="employeeLogin()">Sign In</button>
+    </div>
+  </div>
+
+  <div id="appShell">
+    <div class="topbar">
+      <div><span class="title">Transaction Portal</span><span class="badge-emp" id="topEmpName">EMPLOYEE</span></div>
+      <div class="topbar-right"><button onclick="employeeLogout()">Logout</button></div>
+    </div>
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="dashboard" onclick="switchEmpTab('dashboard')">Dashboard</button>
+      <button class="tab-btn" data-tab="customers" onclick="switchEmpTab('customers')">My Customers</button>
+      <button class="tab-btn" data-tab="shopview" onclick="switchEmpTab('shopview')">🗺️ Shop View</button>
+      <button class="tab-btn" data-tab="orders" onclick="switchEmpTab('orders')">Orders</button>
+      <button class="tab-btn" data-tab="attendance" onclick="switchEmpTab('attendance')">Attendance</button>
+    </div>
+    <div class="main" id="mainContent"></div>
+  </div>
+
+  <div id="modalHost"></div>
+  <div id="toastHost"></div>
+
+<script>
+/* Cross-host bridge - identical pattern to Admin.html. If the page is
+   opened directly from the Apps Script /exec URL, google.script.run
+   already exists and this block does nothing. If hosted elsewhere
+   (e.g. GitHub Pages), it polyfills google.script.run over fetch. */
+(function(){
+   var GAS_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbwqY1Xy4A8UB_IhV3hxszbZuOoJT985aERQiDLoh9V-c-qnp-81Wz1gULjsMpp9txuKkA/exec';
+
+  if (window.google && window.google.script && window.google.script.run) return;
+  window.google = window.google || {};
+  window.google.script = window.google.script || {};
+
+  function makeRunner(onOk, onErr){
+    return new Proxy({}, {
+      get: function(_, fnName){
+        if (fnName === 'withSuccessHandler') return function(cb){ return makeRunner(cb, onErr); };
+        if (fnName === 'withFailureHandler') return function(cb){ return makeRunner(onOk, cb); };
+        if (fnName === 'withUserObject')     return function(){ return makeRunner(onOk, onErr); };
+        return function(){
+          var args = Array.prototype.slice.call(arguments);
+          fetch(GAS_WEBAPP_URL, { method: 'POST', body: JSON.stringify({ fn: fnName, args: args }) })
+            .then(function(r){ return r.json(); })
+            .then(function(res){
+              if (res.ok) { if (onOk) onOk(res.result); }
+              else { if (onErr) onErr(new Error(res.error)); else console.error(res.error); }
+            })
+            .catch(function(err){ if (onErr) onErr(err); else console.error(err); });
+        };
+      }
+    });
+  }
+  window.google.script.run = makeRunner(null, null);
+})();
+</script>
+
+<!-- NEW: Shop View map libraries -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
+<script>
+let ETOKEN = sessionStorage.getItem('employee_token') || null;
+let EMP_NAME = sessionStorage.getItem('employee_name') || '';
+let MY_CUSTOMERS_CACHE = [];
+let MC_LOADED_ = false; // NEW - true after the first successful My Customers fetch
+let MC_ADV_ = { active:false, days:15, types:[], status:'has' }; // NEW - applied Advanced Filter
+const MC_ADV_TYPES_ = [['visit','Visit'],['sale','Sale'],['payment','Payment'],['order','Order']];
+let MC_LAST_LIST_ = [];   // NEW - the customer list currently shown (used by Share)
+let MC_SHARE_MSGS_ = [];  // NEW - prepared WhatsApp message parts
+let ATTENDANCE_TIMER_ = null;
+
+function q(sel){ return document.querySelector(sel); }
+function esc(s){ return (s===undefined||s===null)?'':String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+function money(n){ n=Number(n)||0; return '₹'+n.toLocaleString('en-IN',{maximumFractionDigits:2}); }
+function stat(label,value){ return '<div class="stat-card"><div class="label">'+esc(label)+'</div><div class="value">'+value+'</div></div>'; }
+// NEW: same stat-card look, just clickable (used by "Today's Visits").
+function clickableStat_(label,value,onclick){ return '<div class="stat-card" style="cursor:pointer" onclick="'+onclick+'"><div class="label">'+esc(label)+' \u203a</div><div class="value">'+value+'</div></div>'; }
+function closeModal(){ q('#modalHost').innerHTML=''; }
+function showToast(msg,type){
+  const host=q('#toastHost'); const el=document.createElement('div');
+  el.className='toast'+(type?' '+type:''); el.textContent=msg; host.appendChild(el);
+  setTimeout(function(){el.remove();},3200);
+}
+
+// NEW: forces the mobile keyboard to open on the first tap for inputs
+// inside the GAS sandboxed iframe (some Android WebViews/Chrome don't
+// hand focus to the OS keyboard on a plain tap in that context).
+function forceMobileFocus_(id){
+  const el = document.getElementById(id);
+  if(!el) return;
+  el.addEventListener('touchend', function(e){ e.preventDefault(); this.focus(); }, {passive:false});
+}
+forceMobileFocus_('empUser');
+forceMobileFocus_('empPass');
+
+/* ================= LOGIN / SESSION ================= */
+
+function employeeLogin(){
+  const user = q('#empUser').value.trim();
+  const pass = q('#empPass').value;
+  const errBox = q('#loginError'); errBox.classList.add('hidden');
+  if(!user || !pass){ errBox.textContent='Enter your Employee ID and password.'; errBox.classList.remove('hidden'); return; }
+  const btn = q('#empLoginBtn'); btn.disabled=true; btn.textContent='Signing in...';
+  google.script.run
+    .withSuccessHandler(function(res){
+      btn.disabled=false; btn.textContent='Sign In';
+      if(res && res.success){
+        ETOKEN = res.token; EMP_NAME = res.employeeName;
+        sessionStorage.setItem('employee_token', res.token);
+        sessionStorage.setItem('employee_name', res.employeeName);
+        enterEmployee();
+      } else { errBox.textContent = (res && res.message) || 'Login failed.'; errBox.classList.remove('hidden'); }
+    })
+    .withFailureHandler(function(){ btn.disabled=false; btn.textContent='Sign In'; errBox.textContent='Login failed.'; errBox.classList.remove('hidden'); })
+    .apiEmployeeLogin(user, pass);
+}
+
+function employeeLogout(){
+  google.script.run.apiEmployeeLogout(ETOKEN);
+  sessionStorage.clear(); ETOKEN = null; EMP_NAME = '';
+  MY_CUSTOMERS_CACHE = []; MC_LOADED_ = false; // NEW - next login fetches fresh once
+  MC_LAST_LIST_ = []; MC_SHARE_MSGS_ = [];
+  EMP_DASH_LOADED_ = false; ORDERS_LOADED_ = false; ATT_STATUS_LOADED_ = false; ATT_HIST_LOADED_ = false; // NEW
+  MC_ADV_ = { active:false, days:15, types:[], status:'has' };
+  if(ATTENDANCE_TIMER_){ clearInterval(ATTENDANCE_TIMER_); ATTENDANCE_TIMER_ = null; }
+  // NEW - Shop View cleanup so a stale map never leaks into the next login
+  SHOP_VIEW_CACHE = []; SHOP_VIEW_LOADED_ = false;
+  if(SHOP_MAP_){ SHOP_MAP_.remove(); SHOP_MAP_ = null; }
+  q('#appShell').style.display='none'; q('#loginScreen').style.display='flex';
+}
+
+function enterEmployee(){
+  q('#loginScreen').style.display='none';
+  q('#appShell').style.display='block';
+  q('#topEmpName').textContent = EMP_NAME || 'EMPLOYEE';
+  switchEmpTab('dashboard');
+}
+
+function onEmployeeSessionError(err){
+  const msg = (err && err.message) ? err.message : String(err || 'Unknown error');
+  console.error('Employee API error:', msg); // open DevTools (F12) Console to read this
+  if (msg.indexOf('EMPLOYEE_SESSION_EXPIRED') !== -1) {
+    showToast('Session expired. Please log in again.', 'err');
+    employeeLogout();
+  } else {
+    showToast('Error: ' + msg, 'err'); // real reason, no forced logout
+  }
+}
+
+window.addEventListener('load', function(){
+  if(ETOKEN){
+    google.script.run.withSuccessHandler(function(res){
+      if(res && res.valid){ EMP_NAME = res.employeeName; sessionStorage.setItem('employee_name', EMP_NAME); enterEmployee(); }
+      else { sessionStorage.clear(); }
+    }).withFailureHandler(function(){ sessionStorage.clear(); }).apiEmployeeCheckSession(ETOKEN);
+  }
+  q('#empPass').addEventListener('keydown', function(e){ if(e.key==='Enter') employeeLogin(); });
+});
+
+function switchEmpTab(tab){
+  document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-tab')===tab); });
+  if(tab==='dashboard') renderEmpDashboard();
+  else if(tab==='customers') renderMyCustomers();
+  else if(tab==='shopview') renderShopView();
+  else if(tab==='orders') renderOrdersPage();
+  else if(tab==='attendance') renderAttendancePage();
+}
+
+/* ================= GEOLOCATION HELPER ================= */
+
+// Wraps navigator.geolocation in a promise; resolves to {lat:'',lng:''}
+// (blank strings, not failure) if location is unavailable/denied, so a
+// missing GPS fix never blocks Check In/Out or a Visit from being saved.
+function captureLocation_(){
+  return new Promise(function(resolve){
+    if(!navigator.geolocation){ resolve({lat:'',lng:''}); return; }
+    navigator.geolocation.getCurrentPosition(
+      function(pos){ resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }); },
+      function(){ resolve({lat:'',lng:''}); },
+      { enableHighAccuracy:true, timeout:8000, maximumAge:0 }
+    );
+  });
+}
+
+/* ================= DASHBOARD ================= */
+
+let EMP_DASH_CACHE_ = null; // NEW
+let EMP_DASH_LOADED_ = false; // NEW
+
+function paintEmpDashboard_(res){ // NEW - split out so both the fresh-load and silent-refresh paths can call it
+  const el = q('#empStats'); if(!el) return;
+  if(!res || !res.success){ el.innerHTML = '<div class="empty-state">Failed to load dashboard.</div>'; return; }
+  el.innerHTML =
+    stat('My Customers / Leads', res.myCustomers + ' / ' + res.myLeads) +
+    clickableStat_("Today's Activity", res.todaysActivityCustomers + ' / ' + res.todaysActivityLeads, 'openTodaysVisitsModal()') +
+    stat('Monthly Sales', money(res.monthlySales)) +
+    stat('Outstanding Due', money(res.outstandingDue));
+}
+
+function renderEmpDashboard(forceReload){
+  const main = q('#mainContent');
+  main.innerHTML =
+    '<div class="page-header"><div><h2>Dashboard</h2><p>Your daily snapshot.</p></div></div>' +
+    '<div class="stat-grid" id="empStats">' + '<div class="stat-card skeleton" style="height:70px"></div>'.repeat(4) + '</div>';
+  // NEW: cache hit - paint instantly, no visible loading, then sync in background
+  if(EMP_DASH_LOADED_ && !forceReload){
+    paintEmpDashboard_(EMP_DASH_CACHE_);
+    refreshEmpDashboardSilently_();
+    return;
+  }
+  google.script.run
+    .withSuccessHandler(function(res){ EMP_DASH_CACHE_ = res; EMP_DASH_LOADED_ = true; paintEmpDashboard_(res); })
+    .withFailureHandler(onEmployeeSessionError)
+    .apiEmployeeGetDashboard(ETOKEN);
+}
+
+// NEW: background re-fetch, no skeleton - repaints only if Dashboard is on screen
+function refreshEmpDashboardSilently_(){
+  google.script.run
+    .withSuccessHandler(function(res){ EMP_DASH_CACHE_ = res; EMP_DASH_LOADED_ = true; if(q('#empStats')) paintEmpDashboard_(res); })
+    .withFailureHandler(function(err){ EMP_DASH_LOADED_ = false; onEmployeeSessionError(err); })
+    .apiEmployeeGetDashboard(ETOKEN);
+}
+
+/* ================= MY CUSTOMERS ================= */
+
+let MC_DAY_FILTER = ''; // NEW - Visited Day filter chip currently active
+let MC_SORT_ = { key: null, dir: 1 }; // NEW - active column sort for My Customers
+function sortMyCustomers_(key){
+  if(MC_SORT_.key === key){ MC_SORT_.dir *= -1; } else { MC_SORT_.key = key; MC_SORT_.dir = 1; }
+  paintMyCustomers_();
+}
+function mcSortArrow_(key){ return MC_SORT_.key===key ? (MC_SORT_.dir===1?' ▲':' ▼') : ''; }
+
+/* ---- NEW: My Customers ON/OFF toggle (ON = Customers [default], OFF = Assigned Leads) ---- */
+let MC_MODE_ = 'customers';   // 'customers' | 'leads'
+let MY_LEADS_CACHE = [];
+let MY_LEADS_LOADED_ = false;
+
+function toggleMcMode_(on){
+  MC_MODE_ = on ? 'customers' : 'leads';
+  applyMcMode_();
+}
+function applyMcMode_(){
+  const leads = (MC_MODE_ === 'leads');
+  const cBox = q('#mcCustomerBox'), lBox = q('#mcLeadBox');
+  if(!cBox || !lBox) return;
+  cBox.classList.toggle('hidden', leads);
+  lBox.classList.toggle('hidden', !leads);
+  if(q('#mcTitle')) q('#mcTitle').textContent = leads ? 'My Assigned Leads' : 'My Customers';
+  if(q('#mcSub')) q('#mcSub').textContent = leads ? 'Leads assigned to you.' : 'Customers assigned to you by Admin.';
+  if(q('#mcToggleLbl')) q('#mcToggleLbl').textContent = leads ? 'LEADS' : 'CUSTOMERS';
+  if(q('#mcModeToggle')) q('#mcModeToggle').checked = !leads;
+  if(leads) renderMyLeads_(false);
+}
+function renderMyLeads_(forceReload){
+  const box = q('#mcLeadBox'); if(!box) return;
+  box.innerHTML =
+    '<div class="filters-bar"><input type="text" id="mlSearch" placeholder="Search lead..." oninput="paintMyLeads_()"></div>' +
+    '<div class="table-scroll" id="mlList"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>';
+  if(MY_LEADS_LOADED_ && !forceReload) paintMyLeads_();
+  google.script.run
+    .withSuccessHandler(function(list){ MY_LEADS_CACHE = list || []; MY_LEADS_LOADED_ = true; paintMyLeads_(); })
+    .withFailureHandler(onEmployeeSessionError)
+    .apiEmployeeGetMyLeads(ETOKEN);
+}
+function paintMyLeads_(){
+  const host = q('#mlList'); if(!host) return;
+  const term = (q('#mlSearch') ? q('#mlSearch').value : '').toLowerCase();
+  const list = MY_LEADS_CACHE.filter(function(l){
+    if(!term) return true;
+    return String(l.name||'').toLowerCase().indexOf(term)!==-1 ||
+           String(l.phoneNo||'').indexOf(term)!==-1 ||
+           String(l.leadId||'').toLowerCase().indexOf(term)!==-1 ||
+           String(l.area||'').toLowerCase().indexOf(term)!==-1;
+  });
+  if(!list.length){ host.innerHTML = '<div class="empty-state">No assigned leads found.</div>'; return; }
+  host.innerHTML = '<table><thead><tr><th>Lead</th><th style="width:130px">Action</th><th>Area</th><th>Last Activity Date</th><th>Notes (Last Notes)</th><th>Status</th></tr></thead><tbody>' +
+    list.map(function(l){
+      const lid = esc(l.leadId);
+      const note = String(l.lastNote||'');
+      const shortNote = note.length > 40 ? note.substring(0,40)+'...' : note;
+      return '<tr><td class="lead-link" onclick="openLeadDetail_(\''+lid+'\')">'+esc(l.name||'—')+'</td>' +
+        '<td style="white-space:nowrap;">' +
+          '<button class="icon-btn" title="Call" onclick="callLead_(\''+esc(l.phoneNo||'')+'\',\''+lid+'\')">📞</button> ' +
+          '<button class="icon-btn" title="Edit Lead" onclick="openLeadEditModal_(\''+lid+'\')">✏️</button> ' +
+          '<button class="icon-btn add-visit" title="Add Note" onclick="openLeadNoteModal_(\''+lid+'\',\''+esc(l.name||'')+'\')">+</button>' +
+        '</td>' +
+        '<td>'+esc(l.area||'—')+'</td>' +
+        '<td>'+esc(l.lastActivityDate||'—')+'</td>' +
+        '<td class="lead-note-cell" title="'+esc(note)+'" onclick="showLeadNote_(\''+lid+'\')">'+(shortNote ? esc(shortNote) : '—')+'</td>' +
+        '<td><span class="lead-status'+(l._stSaving?' saving':'')+'" title="Change status" onclick="event.stopPropagation();openLeadStatusMenu_(this,\''+lid+'\')">'+esc(leadStatusLabel_(l.status))+' <span style="font-size:9px;">&#9662;</span></span></td></tr>';
+    }).join('') + '</tbody></table>';
+}
+
+/* ---- NEW: Assigned Leads - call / notes / edit / details ---- */
+
+// Same dial method as callCustomer_ (tel:), but never builds an invalid URL.
+function callLead_(phone, leadId){
+  const m = String(phone||'').replace(/[^\d+]/g,'');
+  if(!m){ showToast('Phone number not available for this lead.', 'err'); return; }
+  if(leadId) logLeadCall_(leadId);   // NEW - records "Call Clicked" in the lead timeline
+  window.location.href = 'tel:'+m;
+}
+
+/* ---- NEW: Lead Status - 14 fixed values, click to change, saved silently ---- */
+const LEAD_STATUSES_ = ['New Lead','Contacted','No Response','Follow-up','Interested','Quotation Sent','Negotiation','Order Pending','Converted','Customer','Not Interested','Wrong Number','Fake Lead','Duplicate'];
+function leadStatusLabel_(s){ const t = String(s||'').trim(); return LEAD_STATUSES_.indexOf(t) !== -1 ? t : 'Set status'; }
+function findLeadInCache_(leadId){ return MY_LEADS_CACHE.filter(function(x){ return x.leadId === leadId; })[0]; }
+
+let LS_MENU_LEAD_ = '';
+function closeLeadStatusMenu_(){
+  const m = q('#leadStatusMenu'); if(m) m.remove();
+  LS_MENU_LEAD_ = '';
+}
+function openLeadStatusMenu_(el, leadId){
+  const wasOpenFor = LS_MENU_LEAD_;
+  closeLeadStatusMenu_();
+  if(wasOpenFor === leadId) return; // tapping the same status again just closes the menu
+  const l = findLeadInCache_(leadId); if(!l) return;
+  LS_MENU_LEAD_ = leadId;
+  const cur = String(l.status||'').trim();
+  const m = document.createElement('div');
+  m.id = 'leadStatusMenu'; m.className = 'lead-status-menu';
+  m.innerHTML = LEAD_STATUSES_.map(function(s, i){
+    return '<button type="button" class="'+(s===cur?'current':'')+'" onclick="pickLeadStatus_('+i+')">'+esc(s)+'</button>';
+  }).join('');
+  document.body.appendChild(m);
+  const r = el.getBoundingClientRect();
+  const mh = m.offsetHeight, mw = m.offsetWidth;
+  let top = r.bottom + 4;
+  if(top + mh > window.innerHeight - 8) top = Math.max(8, r.top - mh - 4);
+  const left = Math.max(8, Math.min(r.left, window.innerWidth - mw - 8));
+  m.style.top = top + 'px'; m.style.left = left + 'px';
+}
+function pickLeadStatus_(i){
+  const leadId = LS_MENU_LEAD_, status = LEAD_STATUSES_[i];
+  closeLeadStatusMenu_();
+  const l = findLeadInCache_(leadId);
+  if(!l || !status) return;
+  const prev = l.status;
+  if(String(prev||'').trim() === status) return;
+  if(status === 'Converted'){ openLeadConvertModal_(leadId, l.name); return; } // NEW - needs a linked customer first, never set directly
+  // 1) update the screen instantly (optimistic) - no reload, no navigation
+  l.status = status; l._stSaving = true;
+  delete LEAD_DETAIL_CACHE_[leadId];   // NEW - cached Lead 360 for this lead is now out of date
+  paintMyLeads_();
+  // 2) save to the Lead sheet in the background
+  google.script.run
+    .withSuccessHandler(function(res){
+      const cur = findLeadInCache_(leadId);
+      if(cur) cur._stSaving = false;
+      if(!(res && res.success)){
+        if(cur && cur.status === status) cur.status = prev;   // roll back
+        showToast((res && res.message) || 'Could not update status.', 'err');
+      }
+      paintMyLeads_();
+    })
+    .withFailureHandler(function(err){
+      const cur = findLeadInCache_(leadId);
+      if(cur){ cur._stSaving = false; if(cur.status === status) cur.status = prev; }
+      paintMyLeads_();
+      onEmployeeSessionError(err);
+    })
+    .apiEmployeeUpdateLeadStatus(ETOKEN, leadId, status);
+}
+/* ---- NEW: Convert Lead (Direct/Indirect + pick an EXISTING customer) ---- */
+let LC_LEAD_ID_ = '', LC_SELECTED_CID_ = '', LC_SEARCH_TIMER_ = null;
+function openLeadConvertModal_(leadId, leadName){
+  LC_LEAD_ID_ = leadId; LC_SELECTED_CID_ = '';
+  q('#modalHost').innerHTML =
+    '<div class="modal-overlay" onclick="if(event.target===this) closeModal()"><div class="modal" style="max-width:520px;">' +
+      '<div class="modal-head"><h3>Convert Lead</h3><button class="modal-close" onclick="closeModal()">&times;</button></div>' +
+      '<div class="modal-body">' +
+        '<p style="margin:0 0 12px;font-size:13.5px;">Lead: <strong>'+esc(leadName)+'</strong></p>' +
+        '<div class="field"><label>Conversion Type</label>' +
+          '<div class="conv-type-row">' +
+            '<label><input type="radio" name="lcType" value="Direct" checked> Direct</label>' +
+            '<label><input type="radio" name="lcType" value="Indirect"> Indirect</label>' +
+          '</div>' +
+        '</div>' +
+        '<div class="field"><label>Select Existing Customer *</label><input type="text" id="lcSearch" placeholder="Search customer by name / mobile / area..." oninput="onLcSearch_()"></div>' +
+        '<div class="conv-cust-list" id="lcCustList"><div class="skeleton"></div></div>' +
+        '<div class="field" style="margin-top:12px;"><label>Remark (optional)</label><textarea id="lcRemark" rows="2" placeholder="e.g. Existing shop owner, same as CUS26...0049"></textarea></div>' +
+      '</div>' +
+      '<div class="modal-actions"><button class="btn btn-primary" id="lcSaveBtn" onclick="saveLeadConvert_()">Convert</button><button class="btn btn-ghost" onclick="closeModal()">Cancel</button></div>' +
+    '</div></div>';
+  loadLcCustomers_('');
+}
+function onLcSearch_(){
+  clearTimeout(LC_SEARCH_TIMER_);
+  LC_SEARCH_TIMER_ = setTimeout(function(){ loadLcCustomers_(q('#lcSearch').value.trim()); }, 300);
+}
+function loadLcCustomers_(query){
+  const host = q('#lcCustList'); if(!host) return;
+  host.innerHTML = '<div class="skeleton"></div>';
+  google.script.run
+    .withSuccessHandler(function(list){
+      if(!q('#lcCustList')) return; // modal closed while the search was in flight
+      if(!list || !list.length){ host.innerHTML = '<div class="empty-state">No matching customers.</div>'; return; }
+      host.innerHTML = list.map(function(c){
+        const sel = c.customerId === LC_SELECTED_CID_ ? ' selected' : '';
+        const badge = c.alreadyConverted ? '<span class="conv-badge" title="'+esc((c.convertedFrom||[]).map(function(f){return f.leadName;}).join(', '))+'">Already Converted</span>' : '';
+        return '<div class="conv-cust-row'+sel+'" onclick="selectLcCustomer_(\''+esc(c.customerId)+'\')">' +
+          '<div class="ccr-name">'+esc(c.customerName)+badge+'</div>' +
+          '<div class="ccr-sub">'+esc(c.mobile||'—')+' &middot; '+esc(c.area||c.address||'—')+'</div>' +
+        '</div>';
+      }).join('');
+    })
+    .withFailureHandler(function(){ host.innerHTML = '<div class="empty-state">Could not load customers.</div>'; })
+    .apiEmployeeSearchAllCustomers(ETOKEN, query);
+}
+function selectLcCustomer_(customerId){
+  LC_SELECTED_CID_ = customerId;
+  Array.prototype.forEach.call(document.querySelectorAll('.conv-cust-row'), function(el){ el.classList.remove('selected'); });
+  if(event && event.currentTarget) event.currentTarget.classList.add('selected');
+}
+function saveLeadConvert_(){
+  if(!LC_SELECTED_CID_){ showToast('Please select a customer to convert this lead to.', 'err'); return; }
+  const type = (document.querySelector('input[name="lcType"]:checked') || {}).value || 'Direct';
+  const remark = q('#lcRemark').value.trim();
+  const leadId = LC_LEAD_ID_;
+  const btn = q('#lcSaveBtn'); btn.disabled=true; btn.textContent='Converting...';
+  google.script.run
+    .withSuccessHandler(function(res){
+      btn.disabled=false; btn.textContent='Convert';
+      if(res && res.success){
+        const cur = findLeadInCache_(leadId); if(cur) cur.status = 'Converted';
+        delete LEAD_DETAIL_CACHE_[leadId];
+        showToast('Lead converted.', 'ok');
+        closeModal();
+        paintMyLeads_();
+      } else { showToast((res && res.message) || 'Failed to convert lead.', 'err'); }
+    })
+    .withFailureHandler(function(){ btn.disabled=false; btn.textContent='Convert'; showToast('Failed to convert lead.', 'err'); })
+    .apiEmployeeConvertLead(ETOKEN, leadId, LC_SELECTED_CID_, type, remark);
+}
+
+document.addEventListener('click', function(e){ const m = q('#leadStatusMenu'); if(m && !m.contains(e.target)) closeLeadStatusMenu_(); });
+document.addEventListener('keydown', function(e){ if(e.key === 'Escape') closeLeadStatusMenu_(); });
+window.addEventListener('resize', closeLeadStatusMenu_);
+document.addEventListener('scroll', function(e){ const m = q('#leadStatusMenu'); if(m && e.target !== m && !m.contains(e.target)) closeLeadStatusMenu_(); }, true);
+
+function refreshMyLeadsSilently_(){
+  google.script.run
+    .withSuccessHandler(function(list){ MY_LEADS_CACHE = list || []; MY_LEADS_LOADED_ = true; paintMyLeads_(); })
+    .withFailureHandler(onEmployeeSessionError)
+    .apiEmployeeGetMyLeads(ETOKEN);
+}
+
+// Click / tap on the truncated note -> full latest note.
+function showLeadNote_(leadId){
+  const l = MY_LEADS_CACHE.filter(function(x){ return x.leadId === leadId; })[0];
+  if(!l || !l.lastNote){ return; }
+  q('#modalHost').innerHTML =
+    '<div class="modal-overlay" onclick="if(event.target===this) closeModal()"><div class="modal">' +
+      '<div class="modal-head"><h3>Latest Note</h3><button class="modal-close" onclick="closeModal()">&times;</button></div>' +
+      '<div class="modal-body">' +
+        '<p style="margin:0 0 6px;font-size:13.5px;"><strong>'+esc(l.name)+'</strong></p>' +
+        '<p style="margin:0 0 10px;font-size:11.5px;color:var(--text-3);font-weight:700;">'+esc(l.lastActivityDate||'')+'</p>' +
+        '<div style="font-size:14px;white-space:pre-wrap;word-break:break-word;">'+esc(l.lastNote)+'</div>' +
+      '</div>' +
+      '<div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">Close</button></div>' +
+    '</div></div>';
+}
+
+/* ---- Add Note (historical - every note is a NEW entry) ---- */
+let LEAD_NOTE_FROM_ = 'list'; // 'list' | 'detail'
+function openLeadNoteModal_(leadId, leadName, from){
+  LEAD_NOTE_FROM_ = from || 'list';
+  q('#modalHost').innerHTML =
+    '<div class="modal-overlay" onclick="if(event.target===this) closeModal()"><div class="modal">' +
+      '<div class="modal-head"><h3>Add Note</h3><button class="modal-close" onclick="closeModal()">&times;</button></div>' +
+      '<div class="modal-body">' +
+        '<p style="margin:0 0 12px;font-size:13.5px;">Lead: <strong>'+esc(leadName)+'</strong></p>' +
+        '<div class="field"><label>Note</label><textarea id="lnText" rows="4" maxlength="1000" placeholder="e.g. Called customer, asked for price..."></textarea></div>' +
+        '<p style="font-size:12px;color:var(--text-2);margin:0;">Date and time are saved automatically. Earlier notes are never overwritten.</p>' +
+      '</div>' +
+      '<div class="modal-actions"><button class="btn btn-primary" id="lnSaveBtn" onclick="saveLeadNote_(\''+esc(leadId)+'\')">Save Note</button><button class="btn btn-ghost" onclick="closeModal()">Cancel</button></div>' +
+    '</div></div>';
+}
+function saveLeadNote_(leadId){
+  const text = q('#lnText').value.trim();
+  if(!text){ showToast('Please write a note.', 'err'); return; }
+  const btn = q('#lnSaveBtn'); btn.disabled=true; btn.textContent='Saving...';
+  google.script.run
+    .withSuccessHandler(function(res){
+      btn.disabled=false; btn.textContent='Save Note';
+      if(res && res.success){
+        showToast('Note added.', 'ok'); closeModal();
+        delete LEAD_DETAIL_CACHE_[leadId]; if(LEAD_NOTE_FROM_ === 'detail') openLeadDetail_(leadId, true); else refreshMyLeadsSilently_();
+      } else { showToast((res && res.message) || 'Failed to add note.', 'err'); }
+    })
+    .withFailureHandler(function(){ btn.disabled=false; btn.textContent='Save Note'; showToast('Failed to add note.', 'err'); })
+    .apiEmployeeAddLeadNote(ETOKEN, leadId, text);
+}
+
+/* ---- Edit Lead (full lead edit - updates the SAME row, Lead ID read-only) ---- */
+let LEAD_EDIT_FROM_ = 'list';
+// NEW: renders the Edit Lead form right away. "loading"=true means the full
+// record hasn't arrived from the server yet - fields we don't have show a
+// placeholder and Save stays disabled so a half-loaded form can never wipe
+// data that just hasn't loaded yet.
+function renderLeadEditForm_(L, O, loading){
+  const dl = function(id, arr){ return '<datalist id="'+id+'">'+(arr||[]).map(function(v){ return '<option value="'+esc(v)+'">'; }).join('')+'</datalist>'; };
+  const inp = function(id, label, val, extra){ return '<div class="field"><label>'+label+'</label><input type="text" id="'+id+'" value="'+esc(val||'')+'" '+(loading?'disabled placeholder="Loading..."':(extra||''))+'></div>'; };
+  const O_ = O || {};
+  q('#modalHost').innerHTML =
+    '<div class="modal-overlay" onclick="if(event.target===this) closeModal()"><div class="modal" style="max-width:560px;">' +
+      '<div class="modal-head"><h3>Edit Lead</h3><button class="modal-close" onclick="closeModal()">&times;</button></div>' +
+      '<div class="modal-body">' +
+        inp('elId','Lead ID (read-only)',L.leadId,'readonly style="background:var(--neutral-bg);"') +
+        inp('elName','Name *',L.name) +
+        inp('elShop','Shop Original Name',L.shopOriginalName) +
+        inp('elPhone','Phone No',L.phoneNo) +
+        inp('elArea','Area',L.area) +
+        '<div class="field"><label>Address</label><textarea id="elAddress" rows="2" '+(loading?'disabled placeholder="Loading..."':'')+'>'+esc(L.address||'')+'</textarea></div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">' + inp('elLat','Latitude',L.lat) + inp('elLng','Longitude',L.lng) + '</div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">' +
+          inp('elPriority','Priority',L.priority,'list="dlPriority"') +
+          '<div class="field"><label>Lead Status</label><select id="elStatus" '+(loading?'disabled':'')+'>' +
+            (LEAD_STATUSES_.indexOf(String(L.status||'').trim())===-1 ? '<option value="" selected>— Select status —</option>' : '') +
+            LEAD_STATUSES_.map(function(s){
+              // "Converted" needs a linked customer - only settable via the status badge's "Convert Lead" flow.
+              return '<option value="'+esc(s)+'"'+(s===String(L.status||'').trim()?' selected':'')+(s==='Converted'?' disabled':'')+'>'+esc(s)+(s==='Converted'?' (use status badge)':'')+'</option>';
+            }).join('') +
+          '</select></div>' +
+        '</div>' +
+        inp('elServices','Shop Services',L.shopServices) +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">' +
+          inp('elSize','Shop Size',L.shopSize,'list="dlSize"') + inp('elVisited','Visited Day',L.visitedDay,'placeholder="e.g. Monday, Thursday"') +
+        '</div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">' +
+          inp('elOwner','Owner Name',L.ownerName) + inp('elOwnership','Ownership',L.ownership,'list="dlOwnership"') +
+        '</div>' +
+        '<div class="field"><label>Remark</label><textarea id="elRemark" rows="2" '+(loading?'disabled placeholder="Loading..."':'')+'>'+esc(L.remark||'')+'</textarea></div>' +
+        inp('elAssign','Assign Executive (read-only)',L.assignExecutive,'readonly style="background:var(--neutral-bg);"') +
+        dl('dlPriority',O_.priority) + dl('dlSize',O_.shopSize) + dl('dlOwnership',O_.ownership) +
+      '</div>' +
+      '<div class="modal-actions"><button class="btn btn-primary" id="elSaveBtn" '+(loading?'disabled':'')+' onclick="saveLeadEdit_(\''+esc(L.leadId)+'\')">'+(loading?'Loading…':'Update Lead')+'</button><button class="btn btn-ghost" onclick="closeModal()">Cancel</button></div>' +
+    '</div></div>';
+}
+
+function openLeadEditModal_(leadId, from){
+  LEAD_EDIT_FROM_ = from || 'list';
+  const cached = LEAD_DETAIL_CACHE_[leadId];
+  if(cached && cached.success){
+    renderLeadEditForm_(cached.lead, cached.options || {});   // already have the full record - zero network wait
+    return;
+  }
+  // Open the modal INSTANTLY with whatever we already know from the list, then fill in the rest.
+  const l = findLeadInCache_(leadId) || {};
+  renderLeadEditForm_({
+    leadId: leadId, name: l.name, phoneNo: l.phoneNo, area: l.area, status: l.status,
+    shopOriginalName: '', address: '', lat: '', lng: '', priority: '', shopServices: '',
+    shopSize: '', visitedDay: '', ownerName: '', ownership: '', remark: '', assignExecutive: EMP_NAME
+  }, {}, true);
+  google.script.run
+    .withSuccessHandler(function(res){
+      if(!res || !res.success){ showToast((res && res.message) || 'Could not load lead.', 'err'); return; }
+      LEAD_DETAIL_CACHE_[leadId] = res;
+      if(q('#elId') && q('#elId').value === leadId) renderLeadEditForm_(res.lead, res.options || {}); // same modal still open -> fill it in
+    })
+    .withFailureHandler(onEmployeeSessionError)
+    .apiEmployeeGetLeadDetail(ETOKEN, leadId);
+}
+function saveLeadEdit_(leadId){
+  const v = function(id){ return q('#'+id).value.trim(); };
+  if(!v('elName')){ showToast('Lead name is required.', 'err'); return; }
+  const btn = q('#elSaveBtn'); btn.disabled=true; btn.textContent='Saving...';
+  google.script.run
+    .withSuccessHandler(function(res){
+      btn.disabled=false; btn.textContent='Update Lead';
+      if(res && res.success){
+        showToast('Lead updated.', 'ok'); closeModal();
+        delete LEAD_DETAIL_CACHE_[leadId]; if(LEAD_EDIT_FROM_ === 'detail') openLeadDetail_(leadId, true); else refreshMyLeadsSilently_();
+      } else { showToast((res && res.message) || 'Failed to update lead.', 'err'); }
+    })
+    .withFailureHandler(function(){ btn.disabled=false; btn.textContent='Update Lead'; showToast('Failed to update lead.', 'err'); })
+    .apiEmployeeUpdateLead(ETOKEN, leadId, {
+      name: v('elName'), shopOriginalName: v('elShop'), phoneNo: v('elPhone'), area: v('elArea'),
+      address: v('elAddress'), lat: v('elLat'), lng: v('elLng'), priority: v('elPriority'), status: v('elStatus'),
+      shopServices: v('elServices'), shopSize: v('elSize'), visitedDay: v('elVisited'),
+      ownerName: v('elOwner'), ownership: v('elOwnership'), remark: v('elRemark')
+    });
+}
+
+/* ---- Lead 360 details page: in-page (SPA) navigation + full activity timeline ---- */
+let LEAD_DETAIL_CACHE_ = {};   // leadId -> last server response (re-opening a lead is instant)
+let LEAD_DETAIL_OPEN_ = '';    // leadId currently on screen
+let LEADS_VIEW_STASH_ = null;  // Assigned Leads screen, parked (NOT destroyed) while a Lead is open
+
+// Parks the current Assigned Leads DOM (search text, scroll position, everything) in memory.
+function stashLeadsView_(){
+  const main = q('#mainContent');
+  if(!main || !q('#mlList')) return;              // only when the leads list is what's on screen
+  const frag = document.createDocumentFragment();
+  while(main.firstChild) frag.appendChild(main.firstChild);
+  LEADS_VIEW_STASH_ = { frag: frag, scroll: window.pageYOffset || 0 };
+}
+
+// Back button: put the parked list straight back - no rebuild, no skeleton, no waiting.
+function backToMyLeads_(){
+  LEAD_DETAIL_OPEN_ = '';
+  const main = q('#mainContent');
+  MC_MODE_ = 'leads';
+  if(LEADS_VIEW_STASH_ && main){
+    const s = LEADS_VIEW_STASH_; LEADS_VIEW_STASH_ = null;
+    main.innerHTML = '';
+    main.appendChild(s.frag);
+    paintMyLeads_();                 // instant repaint from the in-memory cache
+    window.scrollTo(0, s.scroll);
+    refreshMyLeadsSilently_();       // quiet background sync (no skeleton)
+    return;
+  }
+  renderMyCustomers();               // fallback = the old behaviour
+}
+
+function leadTlClass_(kind){
+  switch(kind){
+    case 'CALL_CLICKED': return 't-call';
+    case 'STATUS_CHANGED': return 't-status';
+    case 'LEAD_CONVERTED': case 'CUSTOMER_CONVERTED': return 't-convert';
+    case 'TAG_REMOVED': return 't-remove';
+    case 'LEAD_CREATED': case 'LEAD_ASSIGNED': case 'LEAD_REASSIGNED': case 'TAG_ADDED': return 't-create';
+    case 'LEAD_UPDATED': case 'ACTIVITY_CHANGED': case 'VISIT_ACTION': return 't-edit';
+    default: return '';
+  }
+}
+function leadBackBtn_(){ return '<button class="back-link" id="leadBackBtn" onclick="backToMyLeads_()">&larr; Back to My Assigned Leads</button>'; }
+
+// Paints the Lead 360 page from a server response (same layout as before; only the history card is new).
+function renderLeadDetail_(res){
+  const main = q('#mainContent'); if(!main) return;
+  const L = res.lead, notes = res.notes || [];
+  const tl = (res.timeline && res.timeline.length) ? res.timeline : notes.map(function(n){
+    return { kind:'NOTE_ADDED', label:'Note Added', text:n.note, by:n.by, dateTime:n.dateTime, t:n.t };
+  });
+  const item = function(k, v, span){ return '<div class="profile-item'+(span?' span2':'')+'"><div class="k">'+k+'</div><div class="v">'+(v ? esc(v) : '—')+'</div></div>'; };
+  const lid = esc(L.leadId), nm = esc(L.name);
+  const photoHtml = /^https?:\/\//i.test(L.photo) ? '<a href="'+esc(L.photo)+'" target="_blank" rel="noopener" style="color:var(--primary-accent);">View Photo</a>' : esc(L.photo||'—');
+  const last = tl[0];
+  main.innerHTML =
+    leadBackBtn_() +
+    '<div class="page-header"><div><h2>'+nm+'</h2><p>'+lid+(LEAD_STATUSES_.indexOf(String(L.status||'').trim())!==-1 ? ' &middot; '+esc(L.status) : '')+'</p></div>' +
+      '<div style="display:flex;gap:8px;">' +
+        '<button class="icon-btn" title="Call" onclick="callLead_(\''+esc(L.phoneNo||'')+'\',\''+lid+'\')">📞</button>' +
+        '<button class="icon-btn" title="Edit Lead" onclick="openLeadEditModal_(\''+lid+'\',\'detail\')">✏️</button>' +
+        '<button class="icon-btn add-visit" title="Add Note" onclick="openLeadNoteModal_(\''+lid+'\',\''+nm+'\',\'detail\')">+</button>' +
+      '</div></div>' +
+    '<div class="card"><div class="card-header"><h3>Lead Information</h3></div><div class="card-body"><div class="profile-grid">' +
+      item('Lead ID', L.leadId) + item('Status', LEAD_STATUSES_.indexOf(String(L.status||'').trim())!==-1 ? L.status : '') +
+      item('Name', L.name) + item('Shop Original Name', L.shopOriginalName) +
+      item('Owner Name', L.ownerName) + item('Ownership', L.ownership) +
+      item('Priority', L.priority) + item('Shop Size', L.shopSize) +
+      item('Shop Services', L.shopServices) + item('Visited Day', L.visitedDay) +
+      item('Remark', L.remark, true) +
+    '</div></div></div>' +
+    '<div class="card section-gap"><div class="card-header"><h3>Contact &amp; Location</h3></div><div class="card-body"><div class="profile-grid">' +
+      item('Phone No', L.phoneNo) + item('Area', L.area) +
+      item('Address', L.address, true) +
+      item('Latitude', L.lat) + item('Longitude', L.lng) +
+      '<div class="profile-item"><div class="k">Photo</div><div class="v">'+photoHtml+'</div></div>' +
+    '</div></div></div>' +
+    '<div class="card section-gap"><div class="card-header"><h3>Assignment</h3></div><div class="card-body"><div class="profile-grid">' +
+      item('Assign Executive', L.assignExecutive) + item('Lead Generated By', L.leadGenerateBy) +
+      item('Last Activity', last ? last.dateTime : '') + item('Total Notes', String(notes.length)) +
+    '</div></div></div>' +
+    '<div class="card section-gap"><div class="card-header"><h3>Notes &amp; Activity History</h3>' +
+      '<button class="btn btn-secondary" onclick="openLeadNoteModal_(\''+lid+'\',\''+nm+'\',\'detail\')">+ Add Note</button></div>' +
+      '<div class="card-body">' +
+      (tl.length
+        ? '<div class="lead-timeline">'+tl.map(function(x){
+            return '<div class="lt-item '+leadTlClass_(x.kind)+'"><div class="lt-time">'+esc(x.dateTime||'—')+'</div>' +
+              '<span class="lt-tag">'+esc(x.label||'Activity')+'</span>' +
+              (x.text ? '<div class="lt-text">'+esc(x.text)+'</div>' : '') +
+              (x.by ? '<div class="lt-by">by '+esc(x.by)+'</div>' : '') + '</div>';
+          }).join('')+'</div>'
+        : '<div class="empty-state">No activity yet. Tap “+ Add Note” to log the first activity.</div>') +
+    '</div></div>';
+}
+
+// Re-fetches the open lead and repaints in place (keeps scroll position, no skeleton).
+function refreshLeadDetailSilently_(leadId){
+  google.script.run
+    .withSuccessHandler(function(res){
+      if(!res || !res.success) return;
+      LEAD_DETAIL_CACHE_[leadId] = res;
+      if(LEAD_DETAIL_OPEN_ !== leadId || !q('#leadBackBtn')) return;   // user already moved on
+      const y = window.pageYOffset || 0;
+      renderLeadDetail_(res);
+      window.scrollTo(0, y);
+    })
+    .withFailureHandler(function(){})
+    .apiEmployeeGetLeadDetail(ETOKEN, leadId);
+}
+
+// 📞 click -> quietly record "Call Clicked" in the lead's timeline.
+function logLeadCall_(leadId){
+  google.script.run
+    .withSuccessHandler(function(){
+      delete LEAD_DETAIL_CACHE_[leadId];
+      if(LEAD_DETAIL_OPEN_ === leadId && q('#leadBackBtn')) refreshLeadDetailSilently_(leadId);
+    })
+    .withFailureHandler(function(){})
+    .apiEmployeeLogLeadActivity(ETOKEN, leadId, 'CALL_CLICKED', '');
+}
+
+function openLeadDetail_(leadId, fresh){
+  // "fresh" = data just changed (note saved / lead edited) while this page is already open -> refresh in place.
+  if(fresh && LEAD_DETAIL_OPEN_ === leadId && q('#leadBackBtn')){ refreshLeadDetailSilently_(leadId); return; }
+  const main = q('#mainContent');
+  stashLeadsView_();                 // park the list instead of destroying it
+  LEAD_DETAIL_OPEN_ = leadId;
+  const cached = fresh ? null : LEAD_DETAIL_CACHE_[leadId];
+  if(cached){
+    renderLeadDetail_(cached);       // instant - then refreshed quietly below
+  } else {
+    const pre = findLeadInCache_(leadId);
+    main.innerHTML = leadBackBtn_() +
+      (pre ? '<div class="page-header"><div><h2>'+esc(pre.name||'')+'</h2><p>'+esc(pre.leadId||'')+'</p></div></div>' : '') +
+      '<div class="skeleton" style="height:200px"></div>';
+  }
+  window.scrollTo(0, 0);
+  google.script.run
+    .withSuccessHandler(function(res){
+      if(LEAD_DETAIL_OPEN_ !== leadId || !q('#leadBackBtn')) return;   // user already moved on
+      if(!res || !res.success){
+        delete LEAD_DETAIL_CACHE_[leadId];
+        q('#mainContent').innerHTML = leadBackBtn_() + '<div class="empty-state">'+esc((res && res.message) || 'Lead not found.')+'</div>';
+        return;
+      }
+      LEAD_DETAIL_CACHE_[leadId] = res;
+      const y = cached ? (window.pageYOffset || 0) : 0;
+      renderLeadDetail_(res);
+      window.scrollTo(0, y);
+    })
+    .withFailureHandler(onEmployeeSessionError)
+    .apiEmployeeGetLeadDetail(ETOKEN, leadId);
+}
+
+function renderMyCustomers(forceReload){
+  const main = q('#mainContent');
+  main.innerHTML =
+    '<div class="page-header"><div><h2 id="mcTitle">My Customers</h2><p id="mcSub">Customers assigned to you by Admin.</p></div>' +
+      '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">' +
+        '<button class="btn btn-secondary" onclick="openAddCustomerModal()">+ Add Customer</button>' +
+        '<label class="mc-toggle" title="ON = Customers, OFF = Assigned Leads"><span id="mcToggleLbl">CUSTOMERS</span><input type="checkbox" id="mcModeToggle" checked onchange="toggleMcMode_(this.checked)"><span class="mc-slider"></span></label>' +
+      '</div>' +
+    '</div>' +
+    '<div id="mcCustomerBox">' +
+    '<div class="filters-bar"><input type="text" id="mcSearch" placeholder="Search customer..." oninput="paintMyCustomers_()">' +
+      '<button class="btn btn-ghost" id="mcAdvBtn" style="white-space:nowrap;" onclick="toggleMcAdvPanel_()">&#9660; Advanced Filter</button></div>' +
+    mcAdvPanelHtml_() +
+    '<div id="mcAdvSummary" class="hidden" style="font-size:12.5px;color:var(--primary-accent);background:var(--primary-light);padding:8px 12px;border-radius:var(--radius-sm);margin:0 0 12px;"></div>' +
+    '<div id="mcDayFilters" style="display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px;"></div>' +
+    '<div class="table-scroll" id="mcList"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>' +
+    '</div>' + // end #mcCustomerBox
+    '<div id="mcLeadBox" class="hidden"></div>';
+  MC_DAY_FILTER = '';
+  applyMcMode_(); // NEW - ON = Customers (default), OFF = Assigned Leads
+  paintMcAdvBtn_(); // NEW - reflect an already-applied Advanced Filter
+  // NEW: cache hit - paint instantly, no server call, no skeleton
+  if(MC_LOADED_ && !forceReload){
+    paintMcDayFilters_();
+    paintMyCustomers_();
+    refreshMyCustomersSilently_(); // NEW: instant paint from cache, then sync latest data in the background
+    return;
+  }
+  google.script.run
+    .withSuccessHandler(function(list){
+      MY_CUSTOMERS_CACHE = list || [];
+      MC_LOADED_ = true;
+      paintMcDayFilters_();
+      paintMyCustomers_();
+    })
+    .withFailureHandler(onEmployeeSessionError)
+    .apiEmployeeGetMyCustomers(ETOKEN);
+}
+
+// NEW: background re-fetch, no skeleton. Updates the cache, then repaints
+// only if the My Customers list is currently on screen.
+function refreshMyCustomersSilently_(){
+  google.script.run
+    .withSuccessHandler(function(list){
+      MY_CUSTOMERS_CACHE = list || [];
+      MC_LOADED_ = true;
+      paintMcDayFilters_();
+      paintMyCustomers_();
+    })
+    .withFailureHandler(function(err){ MC_LOADED_ = false; onEmployeeSessionError(err); })
+    .apiEmployeeGetMyCustomers(ETOKEN);
+}
+
+// NEW: clickable Mon-Sun chips - click a day to show only customers
+// whose Visited Day includes that day; click again (or "Clear") to reset.
+function paintMcDayFilters_(){
+  const host = q('#mcDayFilters');
+  if(!host) return;
+  host.innerHTML = WEEKDAYS_.map(function(d){
+    const active = MC_DAY_FILTER===d;
+    return '<button class="btn '+(active?'btn-primary':'btn-ghost')+'" style="padding:5px 12px;font-size:12px;" onclick="toggleMcDayFilter_(\''+d+'\')">'+d.substring(0,3)+'</button>';
+  }).join('') + (MC_DAY_FILTER ? '<button class="btn btn-ghost" style="padding:5px 12px;font-size:12px;" onclick="toggleMcDayFilter_(\'\')">Clear</button>' : '');
+}
+function toggleMcDayFilter_(day){
+  MC_DAY_FILTER = (MC_DAY_FILTER===day) ? '' : day;
+  paintMcDayFilters_();
+  paintMyCustomers_();
+}
+
+/* ================= ADVANCED FILTER (activity within N days) ================= */
+
+function mcAdvPanelHtml_(){
+  const lbl = 'display:block;font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:6px;';
+  const chips = MC_ADV_TYPES_.map(function(t){
+    const on = MC_ADV_.types.indexOf(t[0])>-1;
+    return '<label style="display:inline-flex;align-items:center;gap:7px;padding:8px 14px;border:1.5px solid var(--border);border-radius:999px;font-size:13px;font-weight:500;cursor:pointer;background:#fff;">' +
+      '<input type="checkbox" class="mcAdvCb" value="'+t[0]+'" '+(on?'checked':'')+'> '+t[1]+'</label>';
+  }).join('');
+  return '<div id="mcAdvPanel" class="hidden" style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin:0 0 12px;box-shadow:var(--shadow-sm);">' +
+    '<div style="font-size:11.5px;font-weight:700;letter-spacing:.08em;color:var(--text-2);margin-bottom:14px;">ADVANCED CUSTOMER FILTER</div>' +
+    '<div style="margin-bottom:14px;"><label style="'+lbl+'">Days</label>' +
+      '<input type="number" id="mcAdvDays" min="1" value="'+esc(MC_ADV_.days)+'" style="width:110px;padding:9px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:13px;"></div>' +
+    '<div style="margin-bottom:14px;"><label style="'+lbl+'">Activity (select one or more)</label><div style="display:flex;gap:8px;flex-wrap:wrap;">'+chips+'</div></div>' +
+    '<div style="margin-bottom:16px;"><label style="'+lbl+'">Status</label>' +
+      '<select id="mcAdvStatus" style="padding:9px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:13px;min-width:180px;">' +
+        '<option value="has"'+(MC_ADV_.status==='has'?' selected':'')+'>Has Activity</option>' +
+        '<option value="none"'+(MC_ADV_.status==='none'?' selected':'')+'>No Activity</option>' +
+      '</select></div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
+      '<button class="btn btn-primary" style="width:auto;" onclick="applyMcAdvFilter_()">Search / Apply Filter</button>' +
+      '<button class="btn btn-ghost" onclick="clearMcAdvFilter_()">Clear Filter</button>' +
+      '<button class="btn hidden" id="mcAdvShareBtn" title="Share filtered customers on WhatsApp" style="background:#25D366;color:#fff;" onclick="shareMcAdvFilterList_()">&#128994; Share</button>' +
+    '</div>' +
+  '</div>';
+}
+
+function toggleMcAdvPanel_(){
+  const p = q('#mcAdvPanel'); if(!p) return;
+  p.classList.toggle('hidden');
+  paintMcAdvBtn_();
+}
+
+function mcAdvSummaryText_(){
+  const names = MC_ADV_TYPES_.filter(function(t){ return MC_ADV_.types.indexOf(t[0])>-1; }).map(function(t){ return t[1]; }).join(', ');
+  return (MC_ADV_.status==='has' ? 'Has activity' : 'No activity') + ' &middot; ' + names + ' &middot; last ' + MC_ADV_.days + ' day' + (MC_ADV_.days===1?'':'s');
+}
+
+function paintMcAdvBtn_(){
+  const btn = q('#mcAdvBtn'), panel = q('#mcAdvPanel'), sum = q('#mcAdvSummary');
+  if(!btn || !panel) return;
+  const open = !panel.classList.contains('hidden');
+  btn.innerHTML = (open ? '&#9650;' : '&#9660;') + ' Advanced Filter' +
+    (MC_ADV_.active ? ' <span style="background:var(--primary-accent);color:#fff;border-radius:999px;padding:1px 8px;font-size:11px;margin-left:4px;">ON</span>' : '');
+  const shareBtn = q('#mcAdvShareBtn');
+  if(shareBtn) shareBtn.classList.toggle('hidden', !MC_ADV_.active);
+  if(!sum) return;
+  if(MC_ADV_.active){
+    sum.innerHTML = '<strong>Filter:</strong> ' + mcAdvSummaryText_() +
+      ' <a href="#" onclick="clearMcAdvFilter_();return false;" style="margin-left:12px;font-weight:600;">Clear</a>' +
+      ' <a href="#" onclick="shareMcAdvFilterList_();return false;" style="margin-left:12px;font-weight:600;color:#128c4a;">Share</a>';
+    sum.classList.remove('hidden');
+  } else { sum.classList.add('hidden'); sum.innerHTML = ''; }
+}
+
+function applyMcAdvFilter_(){
+  const days = parseInt(q('#mcAdvDays').value, 10);
+  const types = Array.prototype.slice.call(document.querySelectorAll('.mcAdvCb:checked')).map(function(cb){ return cb.value; });
+  if(!days || days < 1){ showToast('Enter the number of days (1 or more).', 'err'); return; }
+  if(!types.length){ showToast('Select at least one activity type.', 'err'); return; }
+  MC_ADV_ = { active:true, days:days, types:types, status:q('#mcAdvStatus').value };
+  q('#mcAdvPanel').classList.add('hidden');
+  paintMcAdvBtn_();
+  paintMyCustomers_();
+}
+
+function clearMcAdvFilter_(){
+  MC_ADV_ = { active:false, days:15, types:[], status:'has' };
+  if(q('#mcAdvDays')) q('#mcAdvDays').value = 15;
+  if(q('#mcAdvStatus')) q('#mcAdvStatus').value = 'has';
+  document.querySelectorAll('.mcAdvCb').forEach(function(cb){ cb.checked = false; });
+  paintMcAdvBtn_();
+  paintMyCustomers_();
+}
+
+// HAS = any selected activity within N days; NONE = no selected activity within N days.
+function mcAdvMatch_(c){
+  const d = new Date(); d.setHours(0,0,0,0);
+  const cutoff = d.getTime() - MC_ADV_.days * 86400000;
+  const rawKey = { visit:'lastLogVisitRaw', sale:'lastSaleDateRaw', payment:'lastPaymentDateRaw', order:'lastOrderDateRaw' };
+  const hasAny = MC_ADV_.types.some(function(t){ return (Number(c[rawKey[t]])||0) >= cutoff; });
+  return MC_ADV_.status==='has' ? hasAny : !hasAny;
+}
+
+/* ================= SHARE FILTERED CUSTOMER LIST (WhatsApp) ================= */
+
+const MC_MON_ = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const MC_ADV_LABELS_ = { visit:'Last Visit Logged', sale:'Last Sale', payment:'Last Payment', order:'Last Order' };
+const MC_ADV_RAWKEY_ = { visit:'lastLogVisitRaw', sale:'lastSaleDateRaw', payment:'lastPaymentDateRaw', order:'lastOrderDateRaw' };
+
+function mcFmtDate_(ms){
+  const d = new Date(ms);
+  return ('0'+d.getDate()).slice(-2) + ' ' + MC_MON_[d.getMonth()] + ' ' + d.getFullYear();
+}
+function mcDaysSince_(ms){
+  const t = new Date(); t.setHours(0,0,0,0);
+  const d = new Date(ms); d.setHours(0,0,0,0);
+  return Math.max(0, Math.round((t.getTime() - d.getTime()) / 86400000));
+}
+function mcAgo_(n){ return n===0 ? 'Today' : n + (n===1 ? ' day ago' : ' days ago'); }
+function mcDaysText_(n){ return n===0 ? 'Today' : n + (n===1 ? ' day' : ' days'); }
+
+// Lat,Long link when valid; otherwise an address-search link; otherwise ''.
+function mcMapLink_(c){
+  if(isValidLatLong_(c.latLong)) return 'https://maps.google.com/?q=' + String(c.latLong).trim().replace(/\s+/g,'');
+  const a = String(c.address||'').trim();
+  if(a) return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(a);
+  return '';
+}
+
+// Builds one or more WhatsApp messages (split only if the list is too long for one link).
+function mcBuildSharePartsForWhatsApp_(){
+  const list = MC_LAST_LIST_ || [];
+  const DIV = '━━━━━━━━━━━━━━━━';
+  const typeNames = MC_ADV_TYPES_.filter(function(t){ return MC_ADV_.types.indexOf(t[0])>-1; }).map(function(t){ return t[1]; }).join(', ');
+  const term = q('#mcSearch') ? q('#mcSearch').value.trim() : '';
+
+  let headRest = DIV + '\n';
+  headRest += '*Filter:* ' + (MC_ADV_.status==='has' ? 'Has Activity' : 'No Activity') + ' in ' + typeNames + '\n';
+  headRest += '*Period:* Last ' + MC_ADV_.days + ' day' + (MC_ADV_.days===1 ? '' : 's') + '\n';
+  if(term) headRest += '*Search:* ' + term + '\n';
+  if(MC_DAY_FILTER) headRest += '*Visited Day:* ' + MC_DAY_FILTER + '\n';
+  headRest += '*Prepared By:* ' + EMP_NAME + '\n';
+  headRest += '*Date:* ' + mcFmtDate_(Date.now()) + '\n';
+  headRest += '*Total Customers:* ' + list.length + '\n' + DIV + '\n\n';
+  const foot = '\nPlease follow up with the above customers accordingly.\nThank you.';
+
+  const blocks = list.map(function(c, i){
+    let b = '*' + (i+1) + '. ' + c.customerName + '*\n';
+    b += '*Address:* ' + (String(c.address||'').trim() || 'Not available') + '\n';
+    b += '*Location:* ' + (mcMapLink_(c) || 'Not available') + '\n';
+    let latest = 0;
+    MC_ADV_.types.forEach(function(t){
+      const ms = Number(c[MC_ADV_RAWKEY_[t]]) || 0;
+      if(ms > latest) latest = ms;
+      b += '*' + MC_ADV_LABELS_[t] + ':* ' + (ms ? mcFmtDate_(ms) + ' (' + mcAgo_(mcDaysSince_(ms)) + ')' : 'No record') + '\n';
+    });
+    b += '*Days Since Last Activity:* ' + (latest ? mcDaysText_(mcDaysSince_(latest)) : 'No activity recorded') + '\n';
+    return b;
+  });
+
+  // Group customers so each message stays inside a safe WhatsApp link size.
+  const MAX = 5500;
+  const reserve = encodeURIComponent(headRest + foot).length + 80;
+  const groups = []; let cur = [], curLen = reserve;
+  blocks.forEach(function(b, i){
+    const l = encodeURIComponent(b + '\n').length;
+    if(cur.length && curLen + l > MAX){ groups.push(cur); cur = []; curLen = reserve; }
+    cur.push({ text: b, idx: i+1 }); curLen += l;
+  });
+  if(cur.length) groups.push(cur);
+
+  return groups.map(function(g, gi){
+    const title = '*CUSTOMER LEAD LIST' + (groups.length>1 ? ' (Part ' + (gi+1) + ' of ' + groups.length + ')' : '') + '*\n';
+    return {
+      text: title + headRest + g.map(function(x){ return x.text; }).join('\n') + foot,
+      from: g[0].idx, to: g[g.length-1].idx
+    };
+  });
+}
+
+function shareMcAdvFilterList_(){
+  if(!MC_ADV_.active){ showToast('Apply an Advanced Filter first.', 'err'); return; }
+  if(!MC_LAST_LIST_.length){ showToast('No customers to share.', 'err'); return; }
+  MC_SHARE_MSGS_ = mcBuildSharePartsForWhatsApp_();
+  if(MC_SHARE_MSGS_.length === 1){ shareMcPart_(0); return; }
+  q('#modalHost').innerHTML =
+    '<div class="modal-overlay" onclick="if(event.target===this) closeModal()"><div class="modal">' +
+      '<div class="modal-head"><h3>Share on WhatsApp</h3><button class="modal-close" onclick="closeModal()">&times;</button></div>' +
+      '<div class="modal-body">' +
+        '<p style="margin:0 0 12px;font-size:13.5px;">'+MC_LAST_LIST_.length+' customers are split into '+MC_SHARE_MSGS_.length+' messages (WhatsApp link size limit). Send each part:</p>' +
+        MC_SHARE_MSGS_.map(function(m, i){
+          return '<button class="btn btn-primary" style="background:#25D366;border-color:#25D366;margin-bottom:8px;" onclick="shareMcPart_('+i+')">&#128994; Send Part '+(i+1)+' of '+MC_SHARE_MSGS_.length+' (customers '+m.from+'-'+m.to+')</button>';
+        }).join('') +
+      '</div>' +
+      '<div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">Close</button></div>' +
+    '</div></div>';
+}
+function shareMcPart_(i){
+  const m = MC_SHARE_MSGS_[i];
+  if(!m) return;
+  window.open('https://wa.me/?text=' + encodeURIComponent(m.text), '_blank');
+}
+
+function paintMyCustomers_(){
+  const host = q('#mcList');
+  if(!host) return;
+  const term = (q('#mcSearch')?q('#mcSearch').value:'').toLowerCase();
+  const list = MY_CUSTOMERS_CACHE.filter(function(c){
+    if(term && String(c.customerName||'').toLowerCase().indexOf(term)===-1 && String(c.mobile||'').indexOf(term)===-1) return false;
+    // NEW: Advanced Filter (activity within N days)
+    if(MC_ADV_.active && !mcAdvMatch_(c)) return false;
+    // NEW: Visited Day chip filter
+    if(MC_DAY_FILTER){
+      const days = String(c.visitedDay||'').split(',').map(function(s){ return s.trim(); });
+      if(days.indexOf(MC_DAY_FILTER)===-1) return false;
     }
-  </script>
+    return true;
+  });
+  if(MC_SORT_.key){
+    const sk = MC_SORT_.key, sd = MC_SORT_.dir;
+    list.sort(function(a,b){
+      const va = sk==='outstanding' ? (Number(a.outstanding)||0) : sk==='lastSaleDate' ? (Number(a.lastSaleDateRaw)||0) : (Number(a.lastVisitDateRaw)||0);
+      const vb = sk==='outstanding' ? (Number(b.outstanding)||0) : sk==='lastSaleDate' ? (Number(b.lastSaleDateRaw)||0) : (Number(b.lastVisitDateRaw)||0);
+      return (va - vb) * sd;
+    });
+  }
+  MC_LAST_LIST_ = list; // NEW - exactly what the employee currently sees (filters + sort applied)
+  if(!list.length){ host.innerHTML = '<div class="empty-state">No customers found.</div>'; return; }
+  // Action column moved right after Customer. Location icon only shows
+  // when a saved Lat,Long OR Address exists - otherwise a "📍+ Add
+  // Location" icon opens the same edit form used in the profile.
+  const actionsHtml = function(c, cid){
+    const hasLocation = isValidLatLong_(c.latLong); // NEW: Address must NOT affect the "+" icon
+    const locationBtn = hasLocation
+      ? '<button class="icon-btn" title="Location" onclick="event.stopPropagation();openCustomerLocation_(\''+esc(c.latLong||'')+'\',\''+esc(c.address||'')+'\')">📍</button>'
+      : '<button class="icon-btn" title="Add Location" onclick="event.stopPropagation();openCustomerContactModal_(\''+cid+'\',\''+esc(c.customerName)+'\',\''+esc(c.mobile||'')+'\',\''+esc(c.address||'')+'\',\''+esc(c.latLong||'')+'\')">📍+</button>';
+    return '<button class="icon-btn" title="Call" onclick="event.stopPropagation();callCustomer_(\''+esc(c.mobile||'')+'\')">📞</button> ' +
+      locationBtn + ' ' +
+      '<button class="icon-btn add-visit" title="Add Visit" onclick="event.stopPropagation();openAddVisitModal(\''+cid+'\',\''+esc(c.customerName)+'\')">+</button> ' +
+      '<button class="icon-btn" title="Create Order" onclick="event.stopPropagation();openCreateOrderModal_(\''+cid+'\',\''+esc(c.customerName)+'\',\''+esc(c.address||'')+'\',\''+esc(c.latLong||'')+'\',\''+esc(c.mobile||'')+'\')">📦+</button>';
+  };
+  // Desktop table (unchanged) - hidden on mobile via CSS.
+  const tableHtml = '<table><thead><tr><th>Customer</th><th style="width:104px">Action</th>' +
+    '<th style="cursor:pointer" onclick="sortMyCustomers_(\'outstanding\')">Outstanding'+mcSortArrow_('outstanding')+'</th>' +
+    '<th style="cursor:pointer" onclick="sortMyCustomers_(\'lastSaleDate\')">Last Sale'+mcSortArrow_('lastSaleDate')+'</th>' +
+    '<th style="cursor:pointer" onclick="sortMyCustomers_(\'lastVisitDate\')">Last Visit'+mcSortArrow_('lastVisitDate')+'</th>' +
+    '<th>Visited Day</th></tr></thead><tbody>' +
+    list.map(function(c){
+      const cid = esc(c.customerId);
+      return '<tr class="clickable"><td onclick="openCustomerProfile(\''+cid+'\')">'+esc(c.customerName)+'</td>' +
+        '<td style="white-space:nowrap;">' + actionsHtml(c, cid) + '</td>' +
+        '<td onclick="openCustomerProfile(\''+cid+'\')" style="font-weight:700;color:'+(c.outstanding>0?'#c0392b':'#101828')+'">'+money(c.outstanding)+'</td>' +
+        '<td onclick="openCustomerProfile(\''+cid+'\')">'+esc(c.lastSaleDate||'—')+'</td>' +
+        '<td onclick="openCustomerProfile(\''+cid+'\')">'+esc(c.lastVisitDate||'—')+'</td>' +
+        '<td style="cursor:pointer" title="Click to set" onclick="event.stopPropagation();openVisitedDayModal(\''+cid+'\',\''+esc(c.customerName)+'\',\''+esc(c.visitedDay||'')+'\')">'+esc(c.visitedDay||'Set day')+'</td>' +
+        '</tr>';
+    }).join('') + '</tbody></table>';
+  // Mobile card list - shown only under 640px, no horizontal scroll needed.
+  const cardsHtml = '<div class="customers-mobile-cards">' +
+    list.map(function(c){
+      const cid = esc(c.customerId);
+      return '<div class="customer-card">' +
+        '<div class="cc-top" onclick="openCustomerProfile(\''+cid+'\')"><span class="cc-title">'+esc(c.customerName)+'</span><span style="font-weight:700;color:'+(c.outstanding>0?'#c0392b':'#101828')+'">'+money(c.outstanding)+'</span></div>' +
+        '<div class="cc-row"><span>Last Sale</span><span>'+esc(c.lastSaleDate||'—')+'</span></div>' +
+        '<div class="cc-row"><span>Last Visit</span><span>'+esc(c.lastVisitDate||'—')+'</span></div>' +
+        '<div class="cc-row"><span>Visited Day</span><span onclick="event.stopPropagation();openVisitedDayModal(\''+cid+'\',\''+esc(c.customerName)+'\',\''+esc(c.visitedDay||'')+'\')" style="cursor:pointer;">'+esc(c.visitedDay||'Set day')+'</span></div>' +
+        '<div class="cc-actions">' + actionsHtml(c, cid) + '</div>' +
+      '</div>';
+    }).join('') + '</div>';
+  host.innerHTML = tableHtml + cardsHtml;
+}
+/* ---- Customer profile (basic info + full transaction history) ---- */
+
+function openCustomerProfile(customerId){
+  const main = q('#mainContent');
+  main.innerHTML = '<button class="back-link" onclick="renderMyCustomers()">&larr; Back to My Customers</button><div class="skeleton" style="height:200px"></div>';
+  google.script.run
+    .withSuccessHandler(function(res){
+      if(!res || !res.success){ showToast(res && res.message || 'Failed to load customer.', 'err'); renderMyCustomers(); return; }
+      const p = res.profile;
+      const txns = res.transactions || [];
+      // NEW: build a classic ledger - oldest first, running balance after
+      // every line, starting from Opening Balance. Same signed rule used
+      // everywhere else in this project (Sale: +balanceAmount, Credit
+      // Note: -amount, Payment-in: -(receivedAmount+paidAmount)).
+      // FIX: a blind .reverse() only flips the WHOLE array - for
+      // transactions on the SAME date it also swaps their relative
+      // order, which then attaches the running Balance to the wrong
+      // row. Sort explicitly instead: oldest date first, and for a
+      // tie (same date) keep sheet entry order via rowNumber - the
+      // SAME tie-break rule runFifoEngine_ already uses - so this
+      // ledger and the FIFO bill status always agree.
+           // NEW: build a classic ledger - oldest first, running balance after
+      // every line, starting from Opening Balance. Same signed rule used
+      // everywhere else in this project (Sale: +balanceAmount, Credit
+      // Note: -amount, Payment-in: -(receivedAmount+paidAmount)), now
+      // extended with:
+      //   Payment-out -> +(receivedAmount+paidAmount) - money PAID OUT
+      //                  to the customer, mirror of Payment-in. Was
+      //                  previously unhandled and silently dropped.
+      //   Estimate/Quotation -> explicit no-op, ₹0 (only a quote).
+      // FIX: a blind .reverse() only flips the WHOLE array - for
+      // transactions on the SAME date it also swaps their relative
+      // order, attaching the running Balance to the wrong row. Sort
+      // explicitly instead: oldest date first, and for a tie (same
+      // date) keep sheet entry order via rowNumber - the SAME tie-break
+      // rule runFifoEngine_ already uses, so this ledger and the FIFO
+      // bill status always agree.
+      const chrono = txns.slice().sort(function(a, b){
+        const d = (a.dateRaw||0) - (b.dateRaw||0);
+        if (d !== 0) return d;
+        return (a.rowNumber||0) - (b.rowNumber||0);
+      });
+      let running = p.openingBalance;
+      // NEW: proper ledger columns - Description, Debit, Credit (replaces
+      // the old single "Amount" + "Status" columns). The running-balance
+      // MATH below is 100% UNCHANGED from before (same signed rule per
+      // transaction type) - only the display is split into two columns
+      // instead of one, so Balance always agrees exactly with before.
+      function ledgerDesc_(t){
+        if(t.description) return t.description;
+        if(t.transactionType === 'Sale') return 'Sale Invoice';
+        if(t.transactionType === 'Payment-in') return 'Payment Received';
+        if(t.transactionType === 'Payment-out') return 'Payment Paid';
+        if(t.transactionType === 'Credit Note') return 'Credit Note';
+        if(t.transactionType === 'Estimate' || t.transactionType === 'Quotation') return 'Estimate / Quotation';
+        return t.transactionType || '—';
+      }
+      const ledgerRows = chrono.map(function(t){
+        let debit = 0, credit = 0;
+        if(t.transactionType === 'Sale'){ credit = Number(t.balanceAmount)||0; running += credit; }
+        else if(t.transactionType === 'Credit Note'){ debit = Number(t.amount)||0; running -= debit; }
+        else if(t.transactionType === 'Payment-in'){ debit = (Number(t.receivedAmount)||0) + (Number(t.paidAmount)||0); running -= debit; }
+        else if(t.transactionType === 'Payment-out'){ credit = (Number(t.receivedAmount)||0) + (Number(t.paidAmount)||0); running += credit; }
+        // Estimate/Quotation: no-op, ₹0 effect on running balance - both Debit and Credit stay '—'.
+        return '<tr><td>'+esc(t.date)+'</td><td>'+esc(t.transactionType)+'</td><td>'+esc(t.refNo||'—')+'</td><td>'+esc(ledgerDesc_(t))+'</td>' +
+          '<td>'+(debit ? money(debit) : '—')+'</td><td>'+(credit ? money(credit) : '—')+'</td>' +
+          '<td style="font-weight:700;color:'+(running>0?'#c0392b':'#101828')+'">'+money(running)+'</td></tr>';
+      });
+      main.innerHTML =
+        '<button class="back-link" onclick="renderMyCustomers()">&larr; Back to My Customers</button>' +
+        '<div class="page-header"><div><h2>'+esc(p.customerName)+'</h2><p>'+esc(p.customerId)+'</p></div>' +
+          '<div style="display:flex;gap:8px;">' +
+            '<button class="icon-btn" title="Call" onclick="callCustomer_(\''+esc(p.mobile||'')+'\',\''+esc(p.customerId)+'\')">📞</button>' +
+            '<button class="icon-btn add-visit" title="Add Note" onclick="openCustomerNoteModal_(\''+esc(p.customerId)+'\',\''+esc(p.customerName)+'\')">+</button>' +
+            '<button class="btn btn-ghost" onclick="openCustomerContactModal_(\''+esc(p.customerId)+'\',\''+esc(p.customerName)+'\',\''+esc(p.mobile||'')+'\',\''+esc(p.address||'')+'\',\''+esc(p.latLong||'')+'\')">✏ Edit Contact & Location</button>' +
+          '</div>' +
+        '</div>' +
+        '<div class="profile-grid">' +
+          '<div class="profile-item"><div class="k">Mobile</div><div class="v">'+esc(p.mobile||'—')+'</div></div>' +
+          '<div class="profile-item"><div class="k">Email</div><div class="v">'+esc(p.email||'—')+'</div></div>' +
+          '<div class="profile-item"><div class="k">Status</div><div class="v">'+esc(p.status||'—')+'</div></div>' +
+          '<div class="profile-item"><div class="k">Opening Balance</div><div class="v">'+money(p.openingBalance)+'</div></div>' +
+          '<div class="profile-item"><div class="k">Current Balance / Outstanding</div><div class="v" style="font-weight:700;color:'+(p.outstanding>0?'#c0392b':'#101828')+'">'+money(p.outstanding)+'</div></div>' +
+          '<div class="profile-item"><div class="k">Address</div><div class="v">'+esc(p.address||'—')+'</div></div>' +
+          '<div class="profile-item"><div class="k">Area</div><div class="v">'+esc(p.area||'—')+'</div></div>' +
+        '</div>' +
+        (function(){
+          const ch = res.convertedHistory || [];
+          if(!ch.length) return '';
+          return '<div class="card section-gap"><div class="card-header"><h3>Converted History</h3></div><div class="card-body">' +
+            ch.map(function(c){
+              return '<div class="conv-history-card">' +
+                '<div style="font-weight:700;font-size:13.5px;">'+esc(c.leadName||'—')+'</div>' +
+                '<div style="font-size:12px;color:var(--text-2);margin-top:2px;">Lead ID: '+esc(c.leadId)+' &middot; Type: '+esc(c.conversionType)+'</div>' +
+                '<div style="font-size:12px;color:var(--text-2);">Converted: '+esc(c.dateTime||'—')+' &middot; By: '+esc(c.convertedBy||'—')+'</div>' +
+                (c.remark ? '<div style="font-size:12.5px;margin-top:4px;">Remark: '+esc(c.remark)+'</div>' : '') +
+              '</div>';
+            }).join('') +
+          '</div></div>';
+        })() +
+        '<div class="card section-gap">' +
+          '<div class="card-header"><h3>Complete Transaction History</h3></div>' +
+          '<div class="table-scroll card-body">' +
+            (txns.length ? ('<table><thead><tr><th>Date</th><th>Type</th><th>Ref No.</th><th>Description</th><th>Debit</th><th>Credit</th><th>Balance</th></tr></thead><tbody>' +
+              '<tr style="background:var(--neutral-bg);font-weight:600;"><td colspan="6">Opening Balance</td><td>'+money(p.openingBalance)+'</td></tr>' +
+              ledgerRows.join('') + '</tbody></table>') : '<div class="empty-state">No transactions yet.</div>') +
+          '</div>' +
+        '</div>' +
+        '<div class="card section-gap"><div class="card-header"><h3>Notes &amp; Activity History</h3>' +
+          '<button class="btn btn-secondary" onclick="openCustomerNoteModal_(\''+esc(p.customerId)+'\',\''+esc(p.customerName)+'\')">+ Add Note</button></div>' +
+          '<div class="card-body">' +
+          ((res.activity||[]).length
+            ? '<div class="lead-timeline">'+(res.activity||[]).map(function(a){
+                return '<div class="lt-item"><div class="lt-time">'+esc(a.dateTime||'—')+'</div>' +
+                  '<span class="badge">'+esc(a.label)+'</span>' +
+                  '<div class="lt-text">'+esc(a.text)+'</div>'+(a.by?'<div class="lt-by">by '+esc(a.by)+'</div>':'')+'</div>';
+              }).join('')+'</div>'
+            : '<div class="empty-state">No activity yet. Tap “+ Add Note” to log the first one.</div>') +
+        '</div></div>';
+    })
+    .withFailureHandler(onEmployeeSessionError)
+    .apiEmployeeGetCustomerProfile(ETOKEN, customerId);
+}
+
+/* ---- Add Note for a Customer (historical - same pattern as Lead notes) ---- */
+function openCustomerNoteModal_(customerId, customerName){
+  q('#modalHost').innerHTML =
+    '<div class="modal-overlay" onclick="if(event.target===this) closeModal()"><div class="modal">' +
+      '<div class="modal-head"><h3>Add Note</h3><button class="modal-close" onclick="closeModal()">&times;</button></div>' +
+      '<div class="modal-body">' +
+        '<p style="margin:0 0 12px;font-size:13.5px;">Customer: <strong>'+esc(customerName)+'</strong></p>' +
+        '<div class="field"><label>Note</label><textarea id="cnText" rows="4" maxlength="1000" placeholder="e.g. Called customer, discussed pricing..."></textarea></div>' +
+        '<p style="font-size:12px;color:var(--text-2);margin:0;">Date and time are saved automatically. Earlier notes are never overwritten.</p>' +
+      '</div>' +
+      '<div class="modal-actions"><button class="btn btn-primary" id="cnSaveBtn" onclick="saveCustomerNote_(\''+esc(customerId)+'\')">Save Note</button><button class="btn btn-ghost" onclick="closeModal()">Cancel</button></div>' +
+    '</div></div>';
+}
+function saveCustomerNote_(customerId){
+  const text = q('#cnText').value.trim();
+  if(!text){ showToast('Please write a note.', 'err'); return; }
+  const btn = q('#cnSaveBtn'); btn.disabled=true; btn.textContent='Saving...';
+  google.script.run
+    .withSuccessHandler(function(res){
+      btn.disabled=false; btn.textContent='Save Note';
+      if(res && res.success){
+        showToast('Note added.', 'ok'); closeModal();
+        openCustomerProfile(customerId);
+      } else { showToast((res && res.message) || 'Failed to add note.', 'err'); }
+    })
+    .withFailureHandler(function(){ btn.disabled=false; btn.textContent='Save Note'; showToast('Failed to add note.', 'err'); })
+    .apiEmployeeAddCustomerNote(ETOKEN, customerId, text);
+}
+
+/* ---- Add Customer (auto-assigned to logged-in employee) ---- */
+
+function openAddCustomerModal(){
+  q('#modalHost').innerHTML =
+    '<div class="modal-overlay" onclick="if(event.target===this) closeModal()"><div class="modal">' +
+      '<div class="modal-head"><h3>Add Customer (New Lead)</h3><button class="modal-close" onclick="closeModal()">&times;</button></div>' +
+      '<div class="modal-body">' +
+        '<div id="acDuplicate" class="hidden"></div>' +
+        '<div class="field"><label>Customer / Shop Name *</label><input type="text" id="acName"></div>' +
+        '<div class="field"><label>Mobile Number *</label><input type="text" id="acMobile" oninput="checkAcDuplicate_()"></div>' +
+        '<div class="field"><label>Email (optional)</label><input type="text" id="acEmail"></div>' +
+        '<div class="field"><label>Opening Balance (optional)</label><input type="number" id="acOpening" value="0"></div>' +
+        '<div class="field"><label>Address (optional)</label><textarea id="acAddress" rows="2"></textarea></div>' +
+        '<div class="field"><label>Lat,Long (optional - more accurate than Address for the Location icon)</label><input type="text" id="acLatLong" placeholder="e.g. 22.5726,88.3639"></div>' +
+        '<button class="btn btn-ghost" style="width:100%;margin:0 0 12px;" onclick="captureAcLocation_()">📍 Use My Current Location</button>' +
+        '<p style="font-size:12px;color:var(--text-2);margin:0;">This will be saved as a <strong>Lead</strong> assigned to you (<strong>'+esc(EMP_NAME)+'</strong>). It becomes a customer only after it is converted/approved.</p>' +
+      '</div>' +
+      '<div class="modal-actions"><button class="btn btn-primary" id="acSaveBtn" onclick="saveNewCustomer()">Save</button><button class="btn btn-ghost" onclick="closeModal()">Cancel</button></div>' +
+    '</div></div>';
+}
+
+// NEW: live duplicate-phone check as the employee types the mobile
+// number - shows which existing customer already has that number and
+// who it's assigned to, BEFORE they hit Save.
+let AC_DUP_TIMER_ = null;
+function checkAcDuplicate_(){
+  clearTimeout(AC_DUP_TIMER_);
+  const mobile = q('#acMobile').value.trim();
+  const box = q('#acDuplicate');
+  if(!mobile){ box.className='hidden'; box.innerHTML=''; return; }
+  AC_DUP_TIMER_ = setTimeout(function(){
+    google.script.run
+      .withSuccessHandler(function(res){
+        if(res && res.exists){
+          box.className='duplicate-warning';
+          box.innerHTML = 'Already in CRM as <strong>'+esc(res.customerName)+'</strong> ('+esc(res.customerId)+'), assigned to <strong>'+esc(res.assignedTo||'Unassigned')+'</strong>.';
+        } else { box.className='hidden'; box.innerHTML=''; }
+      })
+      .withFailureHandler(function(){})
+      .apiEmployeeCheckPhoneExists(ETOKEN, mobile);
+  }, 400);
+}
+
+// NEW: strict Lat,Long check - exactly "lat,long" numbers within range.
+// Empty text, "abc", "22.57" or "22.57,abc" are all treated as missing/invalid.
+function isValidLatLong_(s){
+  const m = String(s===undefined||s===null?'':s).trim().match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/);
+  if(!m) return false;
+  const lat = parseFloat(m[1]), lng = parseFloat(m[2]);
+  return lat>=-90 && lat<=90 && lng>=-180 && lng<=180;
+}
+// NEW: "Use My Current Location" inside the Add Customer form.
+function captureAcLocation_(){
+  captureLocation_().then(function(loc){
+    if(loc.lat && loc.lng) q('#acLatLong').value = loc.lat+','+loc.lng;
+    else showToast('Could not get current location.', 'err');
+  });
+}
+
+function saveNewCustomer(){
+  const name = q('#acName').value.trim();
+  const mobile = q('#acMobile').value.trim();
+  const email = q('#acEmail').value.trim();
+  const opening = Number(q('#acOpening').value) || 0;
+  const address = q('#acAddress').value.trim();
+  let latLong = q('#acLatLong').value.trim();
+  if(!name){ showToast('Customer name is required.', 'err'); return; }
+  if(!mobile){ showToast('Mobile number is required.', 'err'); return; }
+  if(latLong){
+    if(!isValidLatLong_(latLong)){ showToast('Lat,Long must look like 22.5726,88.3639 (or leave it blank).', 'err'); return; }
+    latLong = latLong.replace(/\s+/g, ''); // save as clean "lat,long"
+  }
+  const btn = q('#acSaveBtn'); btn.disabled=true; btn.textContent='Saving...';
+  google.script.run
+    .withSuccessHandler(function(res){
+      btn.disabled=false; btn.textContent='Save';
+      if(res && res.success){
+        showToast('Lead added: '+res.leadId, 'ok');
+        closeModal();
+        MY_LEADS_LOADED_ = false;                       // NEW - next Assigned Leads view fetches fresh data
+        if(MC_MODE_ === 'leads') renderMyLeads_(true);  // NEW - refresh right away if the leads list is on screen
+      } else { showToast((res && res.message) || 'Failed to add lead.', 'err'); }
+    })
+    .withFailureHandler(function(){ btn.disabled=false; btn.textContent='Save'; showToast('Failed to add lead.', 'err'); })
+    .apiEmployeeCreateLead(ETOKEN, { customerName: name, mobile: mobile, email: email, openingBalance: opening, address: address, latLong: latLong });
+}
+
+/* ---- Add Visit (captures live location + date/time automatically) ---- */
+
+function openAddVisitModal(customerId, customerName){
+  q('#modalHost').innerHTML =
+    '<div class="modal-overlay" onclick="if(event.target===this) closeModal()"><div class="modal">' +
+      '<div class="modal-head"><h3>Log Visit</h3><button class="modal-close" onclick="closeModal()">&times;</button></div>' +
+      '<div class="modal-body">' +
+        '<p style="margin:0 0 14px;font-size:13.5px;">Visiting: <strong>'+esc(customerName)+'</strong></p>' +
+        '<div class="field"><label>Notes (optional)</label><textarea id="visitNotes" rows="3"></textarea></div>' +
+        '<p style="font-size:12px;color:var(--text-2);margin:0;">Your current location and the date/time will be captured automatically.</p>' +
+      '</div>' +
+      '<div class="modal-actions"><button class="btn btn-primary" id="visitSaveBtn" onclick="saveVisit_(\''+esc(customerId)+'\')">Save Visit</button><button class="btn btn-ghost" onclick="closeModal()">Cancel</button></div>' +
+    '</div></div>';
+}
+
+function saveVisit_(customerId){
+  const notes = q('#visitNotes').value.trim();
+  const btn = q('#visitSaveBtn'); btn.disabled=true; btn.textContent='Capturing location...';
+  captureLocation_().then(function(loc){
+    btn.textContent='Saving...';
+    google.script.run
+      .withSuccessHandler(function(res){
+        btn.disabled=false; btn.textContent='Save Visit';
+        if(res && res.success){ showToast('Visit logged.', 'ok'); closeModal(); refreshMyCustomersSilently_(); }
+        else { showToast((res && res.message) || 'Failed to log visit.', 'err'); }
+      })
+      .withFailureHandler(function(){ btn.disabled=false; btn.textContent='Save Visit'; showToast('Failed to log visit.', 'err'); })
+      .apiEmployeeAddVisit(ETOKEN, customerId, loc.lat, loc.lng, notes);
+  });
+}
+
+/* ================= CALL / LOCATION (Action column icons) ================= */
+
+// NEW: 📞 Call icon - direct dial to the customer's REGISTERED mobile
+// number (mobile itself is no longer shown in the table, only used here).
+function callCustomer_(mobile, customerId){
+  const m = String(mobile||'').trim();
+  if(!m){ showToast('Mobile number not available for this customer.', 'err'); return; }
+  if(customerId) logCustomerCall_(customerId);   // NEW - records "Calling" in the customer timeline
+  window.location.href = 'tel:'+m;
+}
+// 📞 click -> quietly record the call in the customer's timeline, then
+// refresh the profile's timeline in place if it's the page on screen.
+function logCustomerCall_(customerId){
+  google.script.run
+    .withSuccessHandler(function(){
+      if(q('#mainContent') && q('#mainContent').innerHTML.indexOf(esc(customerId))>-1) openCustomerProfile(customerId);
+    })
+    .withFailureHandler(function(){})
+    .apiEmployeeLogCustomerActivity(ETOKEN, customerId, 'CALL_CLICKED', '');
+}
+
+// NEW: 📍 Location icon - opens Google Maps DIRECTIONS to the customer.
+// No API key / paid integration needed - plain Google Maps URL scheme.
+// Prefers the saved Lat,Long (exact pin); falls back to the saved
+// Address text if no Lat,Long is on file; shows a message if neither exists.
+function openCustomerLocation_(latLong, address){
+  const s = String(latLong||'').trim();
+  if(s){
+    const parts = s.split(',');
+    if(parts.length===2 && !isNaN(parseFloat(parts[0])) && !isNaN(parseFloat(parts[1]))){
+      window.open('https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent(parts[0].trim()+','+parts[1].trim()), '_blank');
+      return;
+    }
+  }
+  const a = String(address||'').trim();
+  if(a){
+    window.open('https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent(a), '_blank');
+    return;
+  }
+  showToast('Address not available for this customer.', 'err');
+}
+
+/* ================= VISITED DAY (multi-select) ================= */
+
+const WEEKDAYS_ = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+
+/* ---- Edit Mobile / Address / Lat,Long (Action column "📍+" AND profile "Edit") ---- */
+function openCustomerContactModal_(customerId, customerName, mobile, address, latLong){
+  q('#modalHost').innerHTML =
+    '<div class="modal-overlay" onclick="if(event.target===this) closeModal()"><div class="modal">' +
+      '<div class="modal-head"><h3>Edit Contact & Location</h3><button class="modal-close" onclick="closeModal()">&times;</button></div>' +
+      '<div class="modal-body">' +
+        '<p style="margin:0 0 12px;font-size:13.5px;">'+esc(customerName)+'</p>' +
+        '<div class="field"><label>Mobile Number</label><input type="text" id="ccMobile" value="'+esc(mobile||'')+'"></div>' +
+        '<div class="field"><label>Address</label><textarea id="ccAddress" rows="2">'+esc(address||'')+'</textarea></div>' +
+        '<div class="field"><label>Lat,Long (optional - more accurate than Address for the Location icon)</label><input type="text" id="ccLatLong" placeholder="e.g. 22.5726,88.3639" value="'+esc(latLong||'')+'"></div>' +
+        '<button class="btn btn-ghost" style="width:100%;margin-top:4px;" onclick="captureCcLocation_()">📍 Use My Current Location</button>' +
+      '</div>' +
+      '<div class="modal-actions"><button class="btn btn-primary" id="ccSaveBtn" onclick="saveCustomerContact_(\''+esc(customerId)+'\')">Save</button><button class="btn btn-ghost" onclick="closeModal()">Cancel</button></div>' +
+    '</div></div>';
+}
+function captureCcLocation_(){
+  captureLocation_().then(function(loc){
+    if(loc.lat && loc.lng) q('#ccLatLong').value = loc.lat+','+loc.lng;
+    else showToast('Could not get current location.', 'err');
+  });
+}
+function saveCustomerContact_(customerId){
+  const mobile = q('#ccMobile').value.trim();
+  const address = q('#ccAddress').value.trim();
+  const latLong = q('#ccLatLong').value.trim();
+  const btn = q('#ccSaveBtn'); btn.disabled=true; btn.textContent='Saving...';
+  google.script.run
+    .withSuccessHandler(function(res){
+      btn.disabled=false; btn.textContent='Save';
+      if(res && res.success){
+        showToast('Updated.', 'ok');
+        closeModal();
+                const c = MY_CUSTOMERS_CACHE.filter(function(x){ return x.customerId===customerId; })[0];
+        if(c){ c.mobile=mobile; c.address=address; c.latLong=latLong; }
+        refreshMyCustomersSilently_();
+        if(q('#mainContent') && q('#mainContent').innerHTML.indexOf(esc(customerId))>-1) openCustomerProfile(customerId); // NEW - also refreshes the Notes & Activity timeline
+      } else { showToast((res && res.message) || 'Failed to update.', 'err'); }
+    })
+    .withFailureHandler(function(){ btn.disabled=false; btn.textContent='Save'; showToast('Failed to update.', 'err'); })
+    .apiEmployeeUpdateCustomerContact(ETOKEN, customerId, mobile, address, latLong);
+}
+
+function openVisitedDayModal(customerId, customerName, currentValue){
+  const selected = String(currentValue||'').split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+  q('#modalHost').innerHTML =
+    '<div class="modal-overlay" onclick="if(event.target===this) closeModal()"><div class="modal">' +
+      '<div class="modal-head"><h3>Visited Day</h3><button class="modal-close" onclick="closeModal()">&times;</button></div>' +
+      '<div class="modal-body">' +
+        '<p style="margin:0 0 10px;font-size:13.5px;">Preferred visit day(s) for <strong>'+esc(customerName)+'</strong></p>' +
+        WEEKDAYS_.map(function(d){
+          return '<label style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:13px;">' +
+            '<input type="checkbox" class="vdCb" value="'+d+'" '+(selected.indexOf(d)>-1?'checked':'')+'> '+d+'</label>';
+        }).join('') +
+      '</div>' +
+      '<div class="modal-actions"><button class="btn btn-primary" id="vdSaveBtn" onclick="saveVisitedDay_(\''+esc(customerId)+'\')">Save</button><button class="btn btn-ghost" onclick="closeModal()">Cancel</button></div>' +
+    '</div></div>';
+}
+
+function saveVisitedDay_(customerId){
+  const days = Array.prototype.slice.call(document.querySelectorAll('.vdCb:checked')).map(function(cb){ return cb.value; });
+  const btn = q('#vdSaveBtn'); btn.disabled=true; btn.textContent='Saving...';
+  google.script.run
+    .withSuccessHandler(function(res){
+      btn.disabled=false; btn.textContent='Save';
+      if(res && res.success){
+        showToast('Visited Day updated.', 'ok');
+        closeModal();
+        const c = MY_CUSTOMERS_CACHE.filter(function(x){ return x.customerId===customerId; })[0];
+        if(c) c.visitedDay = res.visitedDay;
+        paintMyCustomers_();
+        refreshMyCustomersSilently_();
+      } else { showToast((res && res.message) || 'Failed to update.', 'err'); }
+    })
+    .withFailureHandler(function(){ btn.disabled=false; btn.textContent='Save'; showToast('Failed to update.', 'err'); })
+    .apiEmployeeUpdateVisitedDay(ETOKEN, customerId, days);
+}
+
+/* ================= TODAY'S VISITS (Dashboard popup) ================= */
+
+let TODAYS_VISITS_CACHE = [];
+
+function openTodaysVisitsModal(){
+  q('#modalHost').innerHTML =
+    '<div class="modal-overlay" onclick="if(event.target===this) closeModal()"><div class="modal" style="max-width:560px">' +
+      '<div class="modal-head"><h3>Today\'s Visits</h3><button class="modal-close" onclick="closeModal()">&times;</button></div>' +
+      '<div class="modal-body">' +
+        '<input type="text" id="tvSearch" placeholder="Search customer..." oninput="paintTodaysVisits_()" style="width:100%;margin-bottom:10px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;">' +
+        '<div class="table-scroll" style="max-height:360px" id="tvList"><div class="skeleton"></div></div>' +
+      '</div>' +
+    '</div></div>';
+  google.script.run
+    .withSuccessHandler(function(res){
+      if(!res || !res.success){ q('#tvList').innerHTML = '<div class="empty-state">Failed to load.</div>'; return; }
+      TODAYS_VISITS_CACHE = res.visits || [];
+      paintTodaysVisits_();
+    })
+    .withFailureHandler(function(){ q('#tvList').innerHTML = '<div class="empty-state">Failed to load.</div>'; })
+    .apiEmployeeGetTodaysVisits(ETOKEN);
+}
+
+function paintTodaysVisits_(){
+  const host = q('#tvList');
+  if(!host) return;
+  const term = (q('#tvSearch')?q('#tvSearch').value:'').toLowerCase();
+  const list = TODAYS_VISITS_CACHE.filter(function(v){ return !term || String(v.customerName||'').toLowerCase().indexOf(term)!==-1; });
+  if(!list.length){ host.innerHTML = '<div class="empty-state">No visits logged today yet.</div>'; return; }
+  host.innerHTML = '<table><thead><tr><th>Time</th><th>Customer</th><th>Notes</th></tr></thead><tbody>' +
+    list.map(function(v){
+      return '<tr><td>'+esc(v.time)+'</td><td>'+esc(v.customerName)+'</td><td>'+esc(v.notes||'—')+'</td></tr>';
+    }).join('') + '</tbody></table>';
+}
+
+/* ================= ATTENDANCE ================= */
+
+let ATT_STATUS_CACHE_ = null; // NEW
+let ATT_STATUS_LOADED_ = false; // NEW
+let ATT_HIST_LOADED_ = false; // NEW
+
+function renderAttendancePage(forceReload){
+  const main = q('#mainContent');
+  main.innerHTML =
+    '<div class="page-header"><div><h2>🕐 Attendance</h2><p>Mark your Check In / Check Out.</p></div>' +
+      '<button class="btn btn-ghost" onclick="openAttendanceHistoryModal()">📅 Attendance History</button>' +
+    '</div>' +
+    '<div class="attendance-card" id="attCard"><div class="skeleton" style="height:80px"></div></div>' +
+    '<div class="page-header" style="margin-top:26px;"><div><h3 style="margin:0;font-size:15px;">Attendance History</h3></div></div>' +
+    '<div id="attHistoryInline"><div class="skeleton" style="height:120px"></div></div>';
+  // NEW: cache hit - paint instantly, then sync in background
+  if(ATT_STATUS_LOADED_ && ATT_HIST_LOADED_ && !forceReload){
+    paintAttendanceCardV2_(ATT_STATUS_CACHE_);
+    paintAttendanceHistoryInline_();
+    refreshAttendanceSilently_();
+    return;
+  }
+  loadAttendanceStatus_();
+  loadAttendanceHistoryInline_();
+}
+
+// NEW: background re-fetch for both the card and the history list, no skeleton
+function refreshAttendanceSilently_(){
+  google.script.run
+    .withSuccessHandler(function(res){ ATT_STATUS_CACHE_ = res; ATT_STATUS_LOADED_ = true; if(q('#attCard')) paintAttendanceCardV2_(res); })
+    .withFailureHandler(function(err){ ATT_STATUS_LOADED_ = false; onEmployeeSessionError(err); })
+    .apiEmployeeGetAttendanceStatus(ETOKEN);
+  google.script.run
+    .withSuccessHandler(function(res){
+      if(!res || !res.success) return;
+      ATT_HISTORY_INLINE_CACHE_ = res.days.filter(function(d){ return d.shiftsCount > 0; }).reverse();
+      ATT_HIST_LOADED_ = true;
+      if(q('#attHistoryInline')) paintAttendanceHistoryInline_();
+    })
+    .withFailureHandler(function(){ ATT_HIST_LOADED_ = false; })
+    .apiEmployeeGetAttendanceHistory(ETOKEN, '');
+}
+
+// NEW: inline "DATE | TOTAL WORKING HOURS" expandable list, separate
+// from the existing calendar modal (openAttendanceHistoryModal, untouched below).
+let ATT_HISTORY_INLINE_CACHE_ = [];
+let ATT_HISTORY_INLINE_OPEN_ = {};
+function loadAttendanceHistoryInline_(){
+  google.script.run
+    .withSuccessHandler(function(res){
+      // debug line removed - NaN fix confirmed via redeploy
+      const host = q('#attHistoryInline'); if(!host) return;
+      if(!res || !res.success){ host.innerHTML = '<div class="empty-state">Failed to load history.</div>'; return; }
+      ATT_HISTORY_INLINE_CACHE_ = res.days.filter(function(d){ return d.shiftsCount > 0; }).reverse();
+      ATT_HIST_LOADED_ = true; // NEW
+      paintAttendanceHistoryInline_();
+    })
+    .withFailureHandler(onEmployeeSessionError)
+    .apiEmployeeGetAttendanceHistory(ETOKEN, '');
+}
+function paintAttendanceHistoryInline_(){
+  const host = q('#attHistoryInline'); if(!host) return;
+  if(!ATT_HISTORY_INLINE_CACHE_.length){ host.innerHTML = '<div class="empty-state">No attendance recorded yet this month.</div>'; return; }
+  host.innerHTML = ATT_HISTORY_INLINE_CACHE_.map(function(d){
+    const open = !!ATT_HISTORY_INLINE_OPEN_[d.date];
+    const shiftsHtml = d.shifts.map(function(s, idx){
+      return '<div class="att-shift-row">' +
+        '<span class="att-shift-label">Shift '+(idx+1)+'</span>' +
+        '<span>'+esc(fmtAmPm_(s.checkInTime))+' &rarr; '+esc(s.checkOutTime ? fmtAmPm_(s.checkOutTime) : '—')+'</span>' +
+        '<span class="att-shift-dur">'+esc(s.duration || '—')+'</span>' +
+      '</div>';
+    }).join('');
+    return '<div class="att-day-card">' +
+      '<div class="att-day-head" onclick="toggleAttHistoryDay_(\''+d.date+'\')">' +
+        '<span>'+esc(fmtAttDateLabel_(d.date))+'</span>' +
+        '<span class="att-day-total">'+esc(d.totalWorkingHours)+'</span>' +
+        '<span class="att-day-chevron">'+(open ? '&#9650;' : '&#9660;')+'</span>' +
+      '</div>' +
+      '<div class="att-day-sub">'+d.shiftsCount+' shift'+(d.shiftsCount>1?'s':'')+'</div>' +
+      '<div class="att-day-body" style="max-height:'+(open ? '600px' : '0')+'">' + shiftsHtml +
+        '<div class="att-shift-row att-shift-total"><span>TOTAL</span><span></span><span>'+esc(d.totalWorkingHours)+'</span></div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+function toggleAttHistoryDay_(dateKey){
+  ATT_HISTORY_INLINE_OPEN_[dateKey] = !ATT_HISTORY_INLINE_OPEN_[dateKey];
+  paintAttendanceHistoryInline_();
+}
+function fmtAttDateLabel_(dk){ // 'yyyy-MM-dd' -> '22 Sep 2026'
+  const p = dk.split('-').map(Number);
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return p[2] + ' ' + months[p[1]-1] + ' ' + p[0];
+}
+
+function loadAttendanceStatus_(){
+  google.script.run
+    .withSuccessHandler(function(res){ ATT_STATUS_CACHE_ = res; ATT_STATUS_LOADED_ = true; paintAttendanceCardV2_(res); loadAttendanceHistoryInline_(); }) // NEW: also refresh the inline history list after every check-in/out
+    .withFailureHandler(onEmployeeSessionError)
+    .apiEmployeeGetAttendanceStatus(ETOKEN);
+}
+
+// NEW: matches the exact requested layout - 🟢 Present / Check-in /
+// Check-out / Working Hours - and enforces the flow: not checked in ->
+// Check In button; checked in only -> Check Out button; both done ->
+// summary only (buttons enforcing "1 check-in, 1 check-out" already
+// happen server-side in apiEmployeeCheckIn/CheckOut).
+function paintAttendanceCardV2_(res){
+  const card = q('#attCard');
+  if(!card) return;
+  if(!res){ card.innerHTML = '<div class="empty-state">Failed to load attendance.</div>'; return; }
+  if(!res.checkedIn && !res.shiftsCount){
+    card.innerHTML =
+      '<p style="text-align:center;color:var(--text-2);margin:0 0 14px;">You have not checked in today.</p>' +
+      '<p style="text-align:center;font-size:22px;font-weight:700;margin:0 0 18px;letter-spacing:2px;">--:--:--</p>' +
+      '<button class="btn btn-primary" id="attActionBtn" style="width:100%" onclick="empCheckInV2_()">Check In</button>';
+    return;
+  }
+  if(res.checkedIn){
+    card.innerHTML =
+      '<p style="text-align:center;margin:0 0 6px;"><span style="color:#16a34a;font-weight:700;">🟢 Present</span></p>' +
+      '<p style="text-align:center;color:var(--text-2);margin:0 0 4px;font-size:13px;">Checked in at '+esc(fmtAmPm_(res.checkInTime))+'</p>' +
+      (res.shiftsCount>1 ? '<p style="text-align:center;color:var(--text-3);margin:0 0 18px;font-size:12px;">Shift '+res.shiftsCount+' &middot; Today so far: '+esc(res.workingHours)+'</p>' : '<div style="margin-bottom:18px;"></div>') +
+      '<button class="btn btn-primary" id="attActionBtn" style="width:100%" onclick="empCheckOutV2_()">Check Out</button>';
+    return;
+  }
+  // CHANGED: was a dead-end summary with no button. Now allows starting
+  // the next shift, per the multi-shift requirement.
+  card.innerHTML =
+    '<p style="text-align:center;margin:0 0 6px;"><span style="color:#16a34a;font-weight:700;">🟢 '+res.shiftsCount+' shift'+(res.shiftsCount>1?'s':'')+' today</span></p>' +
+    '<p style="text-align:center;color:var(--text-1);margin:0 0 18px;font-size:15px;font-weight:700;">Total: '+esc(res.workingHours)+'</p>' +
+    '<button class="btn btn-primary" id="attActionBtn" style="width:100%" onclick="empCheckInV2_()">Check In</button>';
+}
+
+function fmtAmPm_(t){ // 'HH:mm:ss' (or any string containing it) -> '09:42 AM'
+  if(!t) return '—';
+  const m = String(t).match(/(\d{1,2}):(\d{2})/); // NEW: defensive extraction, same idea as normalizeAttTimeKey_ server-side
+  if(!m) return '—';
+  const hh = Number(m[1]), mm = Number(m[2]);
+  let h = hh % 12; if(h===0) h = 12;
+  const ampm = hh < 12 ? 'AM' : 'PM';
+  return (h<10?'0'+h:h)+':'+(mm<10?'0'+mm:mm)+' '+ampm;
+}
+
+function empCheckInV2_(){
+  const btn = q('#attActionBtn'); if(btn){ btn.disabled=true; btn.textContent='Capturing location...'; }
+  captureLocation_().then(function(loc){
+    if(btn) btn.textContent='Checking in...';
+    google.script.run
+      .withSuccessHandler(function(res){
+        if(res && res.success){ showToast('Checked in.', 'ok'); loadAttendanceStatus_(); }
+        else { if(btn){ btn.disabled=false; btn.textContent='Check In'; } showToast((res&&res.message)||'Failed to check in.', 'err'); }
+      })
+      .withFailureHandler(function(){ if(btn){ btn.disabled=false; btn.textContent='Check In'; } showToast('Failed to check in.', 'err'); })
+      .apiEmployeeCheckIn(ETOKEN, loc.lat, loc.lng);
+  });
+}
+function empCheckOutV2_(){
+  const btn = q('#attActionBtn'); if(btn){ btn.disabled=true; btn.textContent='Capturing location...'; }
+  captureLocation_().then(function(loc){
+    if(btn) btn.textContent='Checking out...';
+    google.script.run
+      .withSuccessHandler(function(res){
+        if(res && res.success){ showToast('Checked out.', 'ok'); loadAttendanceStatus_(); }
+        else { if(btn){ btn.disabled=false; btn.textContent='Check Out'; } showToast((res&&res.message)||'Failed to check out.', 'err'); }
+      })
+      .withFailureHandler(function(){ if(btn){ btn.disabled=false; btn.textContent='Check Out'; } showToast('Failed to check out.', 'err'); })
+      .apiEmployeeCheckOut(ETOKEN, loc.lat, loc.lng);
+  });
+}
+
+/* ---- Attendance History (calendar) ---- */
+let ATT_HISTORY_MONTH = '';
+function openAttendanceHistoryModal(){
+  const now = new Date();
+  ATT_HISTORY_MONTH = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
+  q('#modalHost').innerHTML =
+    '<div class="modal-overlay" onclick="if(event.target===this) closeModal()"><div class="modal" style="max-width:480px">' +
+      '<div class="modal-head"><h3>📅 Attendance History</h3><button class="modal-close" onclick="closeModal()">&times;</button></div>' +
+      '<div class="modal-body">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">' +
+          '<button class="btn btn-ghost" onclick="shiftAttHistoryMonth_(-1)">&larr;</button>' +
+          '<strong id="attHistMonthLabel"></strong>' +
+          '<button class="btn btn-ghost" onclick="shiftAttHistoryMonth_(1)">&rarr;</button>' +
+        '</div>' +
+        '<div style="display:flex;gap:14px;justify-content:center;margin-bottom:10px;font-size:12px;">' +
+          '<span>🟢 Present</span><span>🔴 Absent</span><span>⚪ Upcoming</span>' +
+        '</div>' +
+        '<div id="attHistGrid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;"></div>' +
+        '<p style="font-size:11px;color:var(--text-3);margin-top:12px;text-align:center;">Leave tracking isn\'t set up yet - only Present/Absent are shown.</p>' +
+      '</div>' +
+    '</div></div>';
+  loadAttendanceHistory_();
+}
+function shiftAttHistoryMonth_(delta){
+  const parts = ATT_HISTORY_MONTH.split('-').map(Number);
+  const d = new Date(parts[0], parts[1]-1+delta, 1);
+  ATT_HISTORY_MONTH = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+  loadAttendanceHistory_();
+}
+function loadAttendanceHistory_(){
+  q('#attHistGrid').innerHTML = '<div class="skeleton"></div>';
+  google.script.run
+    .withSuccessHandler(function(res){
+      if(!res || !res.success){ q('#attHistGrid').innerHTML = '<div class="empty-state">Failed to load.</div>'; return; }
+      paintAttendanceHistory_(res);
+    })
+    .withFailureHandler(function(){ q('#attHistGrid').innerHTML = '<div class="empty-state">Failed to load.</div>'; })
+    .apiEmployeeGetAttendanceHistory(ETOKEN, ATT_HISTORY_MONTH);
+}
+function paintAttendanceHistory_(res){
+  const parts = res.monthKey.split('-').map(Number);
+  q('#attHistMonthLabel').textContent = new Date(parts[0], parts[1]-1, 1).toLocaleString('default',{month:'long', year:'numeric'});
+  const firstDow = new Date(parts[0], parts[1]-1, 1).getDay();
+  let html = ['S','M','T','W','T','F','S'].map(function(d){ return '<div style="text-align:center;font-size:10px;color:var(--text-3);font-weight:700;">'+d+'</div>'; }).join('');
+  for(let i=0;i<firstDow;i++) html += '<div></div>';
+  res.days.forEach(function(d){
+    const color = d.status==='Present' ? '#16a34a' : (d.status==='Absent' ? '#dc2626' : '#98a2b3');
+    const bg = d.status==='Present' ? '#ecfdf3' : (d.status==='Absent' ? '#fef2f2' : '#f6f7fb');
+    html += '<div title="'+esc(d.status)+(d.checkInTime?(' - In: '+esc(d.checkInTime)):'')+'" style="text-align:center;padding:6px 0;border-radius:8px;background:'+bg+';color:'+color+';font-size:12px;font-weight:600;">'+d.day+'</div>';
+  });
+  q('#attHistGrid').innerHTML = html;
+}
+
+function paintAttendanceCard_(res){
+  const card = q('#attCard');
+  if(!card) return;
+  if(ATTENDANCE_TIMER_){ clearInterval(ATTENDANCE_TIMER_); ATTENDANCE_TIMER_ = null; }
+
+  if(!res || !res.checkedIn){
+    card.innerHTML =
+      '<div class="att-status">You have not checked in today.</div>' +
+      '<div class="att-timer">--:--:--</div>' +
+      '<button class="btn btn-primary" id="attBtn" onclick="doCheckIn_()">Check In</button>';
+    return;
+  }
+  if(res.checkedOut){
+    card.innerHTML =
+      '<div class="att-status">Checked in at '+esc(res.checkInTime)+', checked out at '+esc(res.checkOutTime)+'.</div>' +
+      '<div class="att-timer">Done for today ✅</div>' +
+      '<button class="btn btn-ghost" disabled>Attendance Complete</button>';
+    return;
+  }
+  // checked in, not yet checked out - show a live-running timer
+  card.innerHTML =
+    '<div class="att-status">Checked in at '+esc(res.checkInTime)+'.</div>' +
+    '<div class="att-timer" id="attTimerText">00:00:00</div>' +
+    '<button class="btn btn-danger" id="attBtn" onclick="doCheckOut_()">Check Out</button>';
+  const parts = String(res.checkInTime||'0:0:0').split(':').map(Number);
+  const checkInMs = new Date();
+  checkInMs.setHours(parts[0]||0, parts[1]||0, parts[2]||0, 0);
+  ATTENDANCE_TIMER_ = setInterval(function(){
+    const diff = Math.max(0, Date.now() - checkInMs.getTime());
+    const h = String(Math.floor(diff/3600000)).padStart(2,'0');
+    const m = String(Math.floor((diff%3600000)/60000)).padStart(2,'0');
+    const s = String(Math.floor((diff%60000)/1000)).padStart(2,'0');
+    const el = q('#attTimerText'); if(el) el.textContent = h+':'+m+':'+s;
+  }, 1000);
+}
+
+function doCheckIn_(){
+  const btn = q('#attBtn'); btn.disabled=true; btn.textContent='Capturing location...';
+  captureLocation_().then(function(loc){
+    google.script.run
+      .withSuccessHandler(function(res){
+        if(res && res.success){ showToast('Checked in.', 'ok'); paintAttendanceCardV2_({ checkedIn:true, checkedOut:false, checkInTime: res.checkInTime }); }
+        else { showToast((res && res.message) || 'Check in failed.', 'err'); btn.disabled=false; btn.textContent='Check In'; }
+      })
+      .withFailureHandler(function(){ showToast('Check in failed.', 'err'); btn.disabled=false; btn.textContent='Check In'; })
+      .apiEmployeeCheckIn(ETOKEN, loc.lat, loc.lng);
+  });
+}
+
+function doCheckOut_(){
+  const btn = q('#attBtn'); btn.disabled=true; btn.textContent='Capturing location...';
+  captureLocation_().then(function(loc){
+    google.script.run
+      .withSuccessHandler(function(res){
+        if(res && res.success){ showToast('Checked out.', 'ok'); loadAttendanceStatus_(); }
+        else { showToast((res && res.message) || 'Check out failed.', 'err'); btn.disabled=false; btn.textContent='Check Out'; }
+      })
+      .withFailureHandler(function(){ showToast('Check out failed.', 'err'); btn.disabled=false; btn.textContent='Check Out'; })
+      .apiEmployeeCheckOut(ETOKEN, loc.lat, loc.lng);
+  });
+}
+/* ================= ORDERS (NEW) ================= */
+
+let MY_ORDERS_CACHE = [];
+let ORDER_ITEM_ROWS_ = [];
+let LAST_CREATED_ORDER_ = null;
+
+let ORDERS_LOADED_ = false; // NEW
+
+function renderOrdersPage(forceReload){
+  const main = q('#mainContent');
+  main.innerHTML =
+    '<div class="page-header"><div><h2>Orders</h2><p>Orders you have created.</p></div></div>' +
+    '<div class="table-scroll" id="ordersList"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>';
+  // NEW: cache hit - paint instantly, then sync in background
+  if(ORDERS_LOADED_ && !forceReload){
+    paintMyOrdersTable_();
+    refreshMyOrdersSilently_();
+    return;
+  }
+  loadMyOrders_();
+}
+
+function loadMyOrders_(){
+  google.script.run
+    .withSuccessHandler(function(res){
+      MY_ORDERS_CACHE = (res && res.success) ? res.orders : [];
+      ORDERS_LOADED_ = true; // NEW
+      paintMyOrdersTable_();
+    })
+    .withFailureHandler(onEmployeeSessionError)
+    .apiEmployeeGetMyOrders(ETOKEN);
+}
+
+// NEW: background re-fetch, no skeleton - repaints only if Orders is on screen
+function refreshMyOrdersSilently_(){
+  google.script.run
+    .withSuccessHandler(function(res){
+      MY_ORDERS_CACHE = (res && res.success) ? res.orders : [];
+      ORDERS_LOADED_ = true;
+      if(q('#ordersList')) paintMyOrdersTable_();
+    })
+    .withFailureHandler(function(err){ ORDERS_LOADED_ = false; onEmployeeSessionError(err); })
+    .apiEmployeeGetMyOrders(ETOKEN);
+}
+
+function paintMyOrdersTable_(){
+  const host = q('#ordersList');
+  if(!host) return;
+  if(!MY_ORDERS_CACHE.length){ host.innerHTML = '<div class="empty-state">No orders yet. Use the 📦+ icon in My Customers to create one.</div>'; return; }
+  const actionsHtml = function(o){
+    return '<button class="icon-btn" title="View" onclick="viewOrderDetail_(\''+esc(o.orderId)+'\')">View</button> ' +
+      '<button class="icon-btn" style="background:#25D366;border-color:#25D366;color:#fff" title="Share on WhatsApp" onclick="shareEmployeeOrderWhatsApp_(\''+esc(o.orderId)+'\')">🟢 WhatsApp</button>';
+  };
+  // Desktop table (unchanged) - hidden on mobile via CSS.
+  const tableHtml = '<table><thead><tr><th>Order No.</th><th>Customer</th><th>Order Date</th><th>Total Items</th><th>Total Qty</th><th>Status</th><th>Action</th></tr></thead><tbody>' +
+    MY_ORDERS_CACHE.map(function(o){
+      return '<tr><td>'+esc(o.orderNo)+'</td>' +
+        '<td>'+esc(o.customerName)+'</td>' +
+        '<td>'+esc(o.orderDate)+'</td>' +
+        '<td>'+o.totalItems+'</td>' +
+        '<td>'+o.totalQty+'</td>' +
+        '<td><span class="badge">'+esc(o.status)+'</span></td>' +
+        '<td style="white-space:nowrap;">' + actionsHtml(o) + '</td></tr>';
+    }).join('') + '</tbody></table>';
+  // Mobile card list - shown only under 640px, no horizontal scroll needed.
+  const cardsHtml = '<div class="orders-mobile-cards">' +
+    MY_ORDERS_CACHE.map(function(o){
+      return '<div class="order-card">' +
+        '<div class="oc-top"><span class="oc-title">'+esc(o.orderNo)+'</span><span class="badge">'+esc(o.status)+'</span></div>' +
+        '<div class="oc-row"><span>Customer</span><span>'+esc(o.customerName)+'</span></div>' +
+        '<div class="oc-row"><span>Order Date</span><span>'+esc(o.orderDate)+'</span></div>' +
+        '<div class="oc-row"><span>Items / Qty</span><span>'+o.totalItems+' / '+o.totalQty+'</span></div>' +
+        '<div class="oc-actions">' + actionsHtml(o) + '</div>' +
+      '</div>';
+    }).join('') + '</div>';
+  host.innerHTML = tableHtml + cardsHtml;
+}
+
+function viewOrderDetail_(orderId){
+  const o = MY_ORDERS_CACHE.find(function(x){ return x.orderId===orderId; });
+  if(!o) return;
+  q('#modalHost').innerHTML =
+    '<div class="modal-overlay" onclick="if(event.target===this) closeModal()"><div class="modal">' +
+      '<div class="modal-head"><h3>'+esc(o.orderNo)+'</h3><button class="modal-close" onclick="closeModal()">&times;</button></div>' +
+      '<div class="modal-body">' +
+        '<p style="margin:0 0 10px;font-size:13.5px;">Customer: <strong>'+esc(o.customerName)+'</strong> &middot; '+esc(o.orderDate)+'</p>' +
+        '<table><thead><tr><th>Product</th><th>Qty</th><th>Remark</th><th>Status</th><th>Action</th></tr></thead><tbody>' +
+          o.items.map(function(it){
+            return '<tr><td>'+esc(it.productName)+'</td><td>'+it.quantity+'</td><td>'+esc(it.remark||'—')+'</td><td>'+esc(it.status)+'</td>' +
+              '<td>' + (String(it.status).toLowerCase()==='delivered'
+                ? '<span class="badge" style="background:#d1fae5;color:#065f46;">Delivered</span>'
+                : '<button class="icon-btn" title="Mark Delivered" onclick="markOrderItemDelivered_(\''+esc(orderId)+'\',\''+esc(it.orderItemId)+'\')">Mark Delivered</button>') +
+              '</td></tr>';
+          }).join('') +
+        '</tbody></table>' +
+        (o.notes ? '<p style="margin:12px 0 0;font-size:13px;color:var(--text-2);">Notes: '+esc(o.notes)+'</p>' : '') +
+      '</div>' +
+      '<div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">Close</button></div>' +
+    '</div></div>';
+}
+
+// NEW: employee marks their own order-item as delivered.
+function markOrderItemDelivered_(orderId, orderItemId){
+  google.script.run
+    .withSuccessHandler(function(res){
+      if(res && res.success){
+        const o = MY_ORDERS_CACHE.find(function(x){ return x.orderId===orderId; });
+        if(o){
+          const it = o.items.find(function(x){ return x.orderItemId===orderItemId; });
+          if(it) it.status = 'Delivered';
+          if(o.items.every(function(x){ return String(x.status).toLowerCase()==='delivered'; })) o.status = 'Delivered';
+        }
+        showToast('Marked as delivered.', 'ok');
+        viewOrderDetail_(orderId);
+        if(q('#ordersList')) paintMyOrdersTable_();
+      } else {
+        showToast((res && res.message) || 'Failed to update.', 'err');
+      }
+    })
+    .withFailureHandler(onEmployeeSessionError)
+    .apiEmployeeUpdateOrderItemStatus(ETOKEN, orderId, orderItemId, 'Delivered');
+}
+
+// Message MY_ORDERS_CACHE se hi banta hai - koi extra server round-trip
+// nahi (Attendance card wali stuck-button problem se bachne ke liye).
+function shareEmployeeOrderWhatsApp_(orderId){
+  const o = MY_ORDERS_CACHE.find(function(x){ return x.orderId===orderId; });
+  if(!o) return;
+  const DIV = '━━━━━━━━━━━━━━━━';
+  let mapsLink = '';
+  if(o.customerLatLong){
+    mapsLink = 'https://maps.google.com/?q=' + o.customerLatLong.trim();
+  }
+
+  let msg = 'Dear Team,\n*A NEW ORDER HAS BEEN GENERATED*\n\n';
+
+  msg += '*ORDER DETAILS*\n' + DIV + '\n';
+  msg += '*Order No.:* ' + o.orderNo + '\n';
+  msg += '*Customer:* ' + o.customerName + '\n';
+  if(o.customerMobile) msg += '*Mobile No.:* ' + o.customerMobile + '\n';
+  if(o.customerAddress) msg += '*Address:* ' + o.customerAddress + '\n';
+  if(mapsLink) msg += '*Location:* ' + mapsLink + '\n';
+  msg += '*Order Date:* ' + o.orderDate + '\n';
+  msg += '*Created By:* ' + o.employeeName + '\n\n';
+
+  msg += '*ORDER ITEMS*\n' + DIV + '\n';
+  msg += o.items.map(function(it,i){
+    let line = (i+1) + '. *' + it.productName + '*\n   Qty: ' + it.quantity;
+    if(it.remark) line += '\n   Remark: ' + it.remark;
+    return line;
+  }).join('\n\n');
+  msg += '\n\n';
+
+  msg += '*ORDER NOTES*\n' + DIV + '\n';
+  msg += (o.notes || 'No additional notes.') + '\n\n';
+
+  msg += 'Please process the order accordingly.\nThank you.';
+  window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
+}
+
+function openCreateOrderModal_(customerId, customerName, customerAddress, customerLatLong, customerMobile){
+  ORDER_ITEM_ROWS_ = [{ productName:'', quantity:'', remark:'' }];
+  q('#modalHost').innerHTML =
+    '<div class="modal-overlay" onclick="if(event.target===this) closeModal()"><div class="modal">' +
+      '<div class="modal-head"><h3>Create New Order</h3><button class="modal-close" onclick="closeModal()">&times;</button></div>' +
+      '<div class="modal-body">' +
+        '<div class="field"><label>Customer Name</label><input type="text" value="'+esc(customerName)+'" disabled></div>' +
+        '<div class="field"><label>Order Date</label><input type="text" value="'+new Date().toLocaleString()+'" disabled></div>' +
+        '<label style="font-size:13px;font-weight:600;display:block;margin:10px 0 6px;">Products</label>' +
+        '<div id="orderItemRows"></div>' +
+        '<button class="btn btn-ghost" style="margin-top:6px;" onclick="addOrderItemRow_()">+ Add Product</button>' +
+      '</div>' +
+      '<div class="modal-actions"><button class="btn btn-primary" id="orderSaveBtn" onclick="saveOrder_(\''+esc(customerId)+'\',\''+esc(customerName)+'\',\''+esc(customerAddress||'')+'\',\''+esc(customerLatLong||'')+'\',\''+esc(customerMobile||'')+'\')">Create Order</button><button class="btn btn-ghost" onclick="closeModal()">Cancel</button></div>' +
+    '</div></div>';
+  paintOrderItemRows_();
+}
+
+function paintOrderItemRows_(){
+  const host = q('#orderItemRows');
+  if(!host) return;
+  host.innerHTML = ORDER_ITEM_ROWS_.map(function(row, idx){
+    return '<div style="border:1px solid var(--border);border-radius:9px;padding:10px;margin-bottom:8px;">' +
+      '<input type="text" placeholder="Product name" value="'+esc(row.productName)+'" style="width:100%;box-sizing:border-box;margin-bottom:8px;" oninput="ORDER_ITEM_ROWS_['+idx+'].productName=this.value">' +
+      '<div style="display:flex;gap:8px;align-items:center;">' +
+        '<input type="number" placeholder="Qty" min="1" value="'+esc(row.quantity)+'" style="flex:1;min-width:0;" oninput="ORDER_ITEM_ROWS_['+idx+'].quantity=this.value">' +
+        '<input type="text" placeholder="Remark (optional)" value="'+esc(row.remark||"")+'" style="flex:2;min-width:0;" oninput="ORDER_ITEM_ROWS_['+idx+'].remark=this.value">' +
+        (ORDER_ITEM_ROWS_.length>1 ? '<button class="icon-btn" style="flex:0 0 auto;" title="Remove" onclick="removeOrderItemRow_('+idx+')">&times;</button>' : '') +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function addOrderItemRow_(){
+  ORDER_ITEM_ROWS_.push({ productName:'', quantity:'', remark:'' });
+  paintOrderItemRows_();
+}
+
+function removeOrderItemRow_(idx){
+  ORDER_ITEM_ROWS_.splice(idx, 1);
+  paintOrderItemRows_();
+}
+
+function saveOrder_(customerId, customerName, customerAddress, customerLatLong, customerMobile){
+  const items = ORDER_ITEM_ROWS_
+    .map(function(r){ return { productName: (r.productName||'').trim(), quantity: Number(r.quantity)||0, remark: (r.remark||'').trim() }; })
+    .filter(function(r){ return r.productName && r.quantity>0; });
+  if(!items.length){ showToast('Add at least one product with a quantity.', 'err'); return; }
+  const btn = q('#orderSaveBtn'); btn.disabled=true; btn.textContent='Creating...';
+  google.script.run
+    .withSuccessHandler(function(res){
+      btn.disabled=false; btn.textContent='Create Order';
+      if(res && res.success){
+        showToast('Order '+res.orderNo+' created.', 'ok');
+        refreshMyCustomersSilently_();
+        if(q('#ordersList')) loadMyOrders_();
+        showOrderCreatedModal_(res.orderNo, customerName, items, customerAddress, customerLatLong, customerMobile);
+      }
+      else { showToast((res && res.message) || 'Failed to create order.', 'err'); }
+    })
+    .withFailureHandler(function(){ btn.disabled=false; btn.textContent='Create Order'; showToast('Failed to create order.', 'err'); })
+    .apiEmployeeCreateOrder(ETOKEN, customerId, items);
+}
+
+// NEW: keeps the flow inside the same popup - shows what was just
+// created plus a WhatsApp button, so no trip to the Orders page needed.
+function showOrderCreatedModal_(orderNo, customerName, items, customerAddress, customerLatLong, customerMobile){
+  LAST_CREATED_ORDER_ = { orderNo: orderNo, customerName: customerName, items: items, orderDate: new Date().toLocaleString(), customerAddress: customerAddress||'', customerLatLong: customerLatLong||'', customerMobile: customerMobile||'' };
+  q('#modalHost').innerHTML =
+    '<div class="modal-overlay" onclick="if(event.target===this) closeModal()"><div class="modal">' +
+      '<div class="modal-head"><h3>Order Created</h3><button class="modal-close" onclick="closeModal()">&times;</button></div>' +
+      '<div class="modal-body">' +
+        '<p style="margin:0 0 10px;font-size:14px;">Order <strong>'+esc(orderNo)+'</strong> for <strong>'+esc(customerName)+'</strong> has been created.</p>' +
+        '<table><thead><tr><th>Product</th><th>Qty</th><th>Remark</th></tr></thead><tbody>' +
+          items.map(function(it){ return '<tr><td>'+esc(it.productName)+'</td><td>'+it.quantity+'</td><td>'+esc(it.remark||'—')+'</td></tr>'; }).join('') +
+        '</tbody></table>' +
+      '</div>' +
+      '<div class="modal-actions">' +
+        '<button class="btn btn-primary" style="background:#25D366;border-color:#25D366;" onclick="shareCreatedOrderWhatsApp_()">🟢 Share on WhatsApp</button>' +
+        '<button class="btn btn-ghost" onclick="closeModal()">Done</button>' +
+      '</div>' +
+    '</div></div>';
+}
+
+function shareCreatedOrderWhatsApp_(){
+  const o = LAST_CREATED_ORDER_;
+  if(!o) return;
+  const DIV = '━━━━━━━━━━━━━━━━';
+  let mapsLink = '';
+  if(o.customerLatLong) mapsLink = 'https://maps.google.com/?q=' + o.customerLatLong.trim();
+  let msg = 'Dear Team,\n*A NEW ORDER HAS BEEN GENERATED*\n\n';
+  msg += '*ORDER DETAILS*\n' + DIV + '\n';
+  msg += '*Order No.:* ' + o.orderNo + '\n';
+  msg += '*Customer:* ' + o.customerName + '\n';
+  if(o.customerMobile) msg += '*Mobile No.:* ' + o.customerMobile + '\n';
+  if(o.customerAddress) msg += '*Address:* ' + o.customerAddress + '\n';
+  if(mapsLink) msg += '*Location:* ' + mapsLink + '\n';
+  msg += '*Order Date:* ' + o.orderDate + '\n';
+  msg += '*Created By:* ' + EMP_NAME + '\n\n';
+  msg += '*ORDER ITEMS*\n' + DIV + '\n';
+  msg += o.items.map(function(it,i){
+    let line = (i+1) + '. *' + it.productName + '*\n   Qty: ' + it.quantity;
+    if(it.remark) line += '\n   Remark: ' + it.remark;
+    return line;
+  }).join('\n\n');
+  msg += '\n\nPlease process the order accordingly.\nThank you.';
+  window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
+}
+
+/* ================= SHOP VIEW (MAP) — NEW ================= */
+
+let SHOP_VIEW_CACHE = [];
+let SHOP_VIEW_LOADED_ = false;
+let SHOP_MAP_ = null;
+let SV_CLUSTER_ = null;
+let SV_MARKERS_ = [];
+let SV_SAT_ON_ = false;
+let SV_OSM_LAYER_ = null;
+let SV_SAT_LAYER_ = null;
+let SV_ME_MARKER_ = null;
+
+function renderShopView(){
+  const main = q('#mainContent');
+  main.innerHTML =
+    '<div class="page-header"><div><h2>🗺️ Shop View</h2><p>All your customers plotted on a map.</p></div></div>' +
+    '<div class="filters-bar"><input type="text" id="svSearch" placeholder="Search customer / shop..." oninput="svFilterMarkers_()" onkeydown="if(event.key===\'Enter\')svGoToFirstMatch_()"></div>' +
+    '<div id="shopViewMapWrap" class="shopview-map-wrap">' +
+      '<div id="shopMap" class="shopview-map"></div>' +
+      '<div class="sv-controls">' +
+        '<button class="sv-ctrl-btn" id="svLayerBtn" title="Toggle Satellite" onclick="svToggleLayer_()">🛰️ Satellite</button>' +
+        '<button class="sv-ctrl-btn" title="Fit all shops" onclick="svFitAll_()">⤢ Fit All</button>' +
+        '<button class="sv-ctrl-btn" title="My current location" onclick="svLocateMe_()">📍 My Location</button>' +
+        '<button class="sv-ctrl-btn" title="Fullscreen" onclick="toggleShopMapFullscreen_()">⛶ Fullscreen</button>' +
+      '</div>' +
+      '<div class="sv-legend"><span>🔵 Shop</span><span>📍 You</span></div>' +
+      '<div id="svLoading" class="sv-loading">Loading map…</div>' +
+    '</div>' +
+    '<div id="svEmpty" class="empty-state hidden">No customers with a saved location yet. Add a Lat,Long from My Customers first.</div>';
+
+  if(SHOP_MAP_){ SHOP_MAP_.remove(); SHOP_MAP_ = null; }
+
+  if(SHOP_VIEW_LOADED_){ svInitMap_(SHOP_VIEW_CACHE); return; }
+
+  google.script.run
+    .withSuccessHandler(function(list){
+      SHOP_VIEW_CACHE = list || [];
+      SHOP_VIEW_LOADED_ = true;
+      svInitMap_(SHOP_VIEW_CACHE);
+    })
+    .withFailureHandler(function(err){
+      onEmployeeSessionError(err);
+      const el = q('#svLoading'); if(el) el.textContent = 'Failed to load map.';
+    })
+    .apiEmployeeGetShopViewCustomers(ETOKEN);
+}
+
+function svInitMap_(list){
+  const wrap = q('#shopViewMapWrap');
+  if(!wrap) return;
+  const valid = (list||[]).filter(function(c){ return typeof c.lat==='number' && typeof c.lng==='number'; });
+  const loadingEl = q('#svLoading'); if(loadingEl) loadingEl.remove();
+  if(!valid.length){
+    wrap.classList.add('hidden');
+    q('#svEmpty').classList.remove('hidden');
+    return;
+  }
+
+  SV_ME_MARKER_ = null;
+  SHOP_MAP_ = L.map('shopMap', { zoomControl:true });
+  SV_OSM_LAYER_ = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom:19, attribution:'&copy; OpenStreetMap contributors'
+  }).addTo(SHOP_MAP_);
+  SV_SAT_LAYER_ = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom:19, attribution:'Tiles &copy; Esri'
+  });
+  SV_SAT_ON_ = false;
+
+  SV_CLUSTER_ = L.markerClusterGroup({ maxClusterRadius:60 });
+  SV_MARKERS_ = [];
+  valid.forEach(function(c){
+    const icon = L.divIcon({ className:'sv-shop-icon', html:'🔵', iconSize:[22,22], iconAnchor:[11,11], popupAnchor:[0,-10] });
+    const marker = L.marker([c.lat, c.lng], { icon:icon });
+    marker.bindPopup(svPopupHtml_(c), { maxWidth:280 });
+    marker._svData = c;
+    SV_CLUSTER_.addLayer(marker);
+    SV_MARKERS_.push(marker);
+  });
+  SHOP_MAP_.addLayer(SV_CLUSTER_);
+  svFitAll_();
+  setTimeout(function(){ if(SHOP_MAP_) SHOP_MAP_.invalidateSize(); }, 150);
+}
+
+function svPopupHtml_(c){
+  const lastOrder = c.lastSaleDate ? (money(c.lastSaleAmount)+' / '+c.lastSaleDate) : '—';
+  return '<div class="sv-popup">' +
+    '<div class="sv-popup-title">'+esc(c.customerName)+'</div>' +
+    svPopupRow_('Customer Name', c.ownerName || c.customerName || '—') +
+    svPopupRow_('Mobile', c.mobile||'—') +
+    svPopupRow_('Address', c.address||c.area||'—') +
+    (c.shopType ? svPopupRow_('Customer Type', c.shopType) : '') +
+    svPopupRow_('Last Order', lastOrder) +
+    svPopupRow_('Total Business', money(c.totalBusiness)) +
+    svPopupRow_('Outstanding', money(c.outstanding)) +
+    svPopupRow_('Last Visit', c.lastVisitDate||'—') +
+    '<div class="sv-popup-actions">' +
+      '<button class="btn btn-secondary" style="flex:1" onclick="openCustomerProfile(\''+esc(c.customerId)+'\')">View Customer</button>' +
+      '<button class="btn btn-ghost" style="flex:1" onclick="openCustomerLocation_(\''+esc(c.latLong)+'\',\''+esc(c.address||'')+'\')">Directions</button>' +
+    '</div>' +
+  '</div>';
+}
+function svPopupRow_(label, value){
+  return '<div class="sv-popup-row"><span class="k">'+esc(label)+'</span><span class="v">'+esc(value)+'</span></div>';
+}
+
+function svToggleLayer_(){
+  if(!SHOP_MAP_) return;
+  SV_SAT_ON_ = !SV_SAT_ON_;
+  if(SV_SAT_ON_){ SHOP_MAP_.removeLayer(SV_OSM_LAYER_); SHOP_MAP_.addLayer(SV_SAT_LAYER_); q('#svLayerBtn').innerHTML='🗺️ Map'; }
+  else { SHOP_MAP_.removeLayer(SV_SAT_LAYER_); SHOP_MAP_.addLayer(SV_OSM_LAYER_); q('#svLayerBtn').innerHTML='🛰️ Satellite'; }
+}
+
+function svFitAll_(){
+  if(!SHOP_MAP_ || !SV_MARKERS_.length) return;
+  const bounds = L.latLngBounds(SV_MARKERS_.map(function(m){ return m.getLatLng(); }));
+  SHOP_MAP_.fitBounds(bounds, { padding:[30,30] });
+}
+
+function svLocateMe_(){
+  if(!SHOP_MAP_) return;
+  showToast('Getting your location…');
+  captureLocation_().then(function(loc){
+    if(!loc.lat || !loc.lng){ showToast('Could not get current location.', 'err'); return; }
+    if(SV_ME_MARKER_) SHOP_MAP_.removeLayer(SV_ME_MARKER_);
+    const meIcon = L.divIcon({ className:'sv-me-icon', html:'📍', iconSize:[26,26], iconAnchor:[13,26], popupAnchor:[0,-24] });
+    SV_ME_MARKER_ = L.marker([loc.lat, loc.lng], { icon:meIcon }).addTo(SHOP_MAP_);
+    SV_ME_MARKER_.bindPopup('Your current location').openPopup();
+    SHOP_MAP_.setView([loc.lat, loc.lng], 15);
+  });
+}
+
+function toggleShopMapFullscreen_(){
+  const el = q('#shopViewMapWrap');
+  if(!el) return;
+  if(!document.fullscreenElement){
+    if(el.requestFullscreen) el.requestFullscreen();
+    else if(el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+  } else {
+    if(document.exitFullscreen) document.exitFullscreen();
+    else if(document.webkitExitFullscreen) document.webkitExitFullscreen();
+  }
+}
+document.addEventListener('fullscreenchange', function(){
+  setTimeout(function(){ if(SHOP_MAP_) SHOP_MAP_.invalidateSize(); }, 120);
+});
+
+function svFilterMarkers_(){
+  if(!SHOP_MAP_ || !SV_CLUSTER_) return;
+  const term = (q('#svSearch')?q('#svSearch').value:'').trim().toLowerCase();
+  SV_CLUSTER_.clearLayers();
+  SV_MARKERS_.forEach(function(m){
+    const c = m._svData;
+    if(!term || String(c.customerName||'').toLowerCase().indexOf(term)>-1 || String(c.mobile||'').indexOf(term)>-1 || String(c.area||'').toLowerCase().indexOf(term)>-1){
+      SV_CLUSTER_.addLayer(m);
+    }
+  });
+}
+
+function svGoToFirstMatch_(){
+  const term = (q('#svSearch')?q('#svSearch').value:'').trim().toLowerCase();
+  if(!term || !SHOP_MAP_) return;
+  const found = SV_MARKERS_.find(function(m){
+    const c = m._svData;
+    return String(c.customerName||'').toLowerCase().indexOf(term)>-1 || String(c.mobile||'').indexOf(term)>-1;
+  });
+  if(found){ SHOP_MAP_.setView(found.getLatLng(), 17); found.openPopup(); }
+  else showToast('No matching shop found.', 'err');
+}
+</script>
 </body>
 </html>
