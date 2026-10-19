@@ -105,6 +105,14 @@
     .mc-slider::after{content:'';position:absolute;top:3px;left:3px;width:16px;height:16px;background:#fff;border-radius:50%;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.25);}
     .mc-toggle input:checked + .mc-slider{background:var(--primary-accent);}
     .mc-toggle input:checked + .mc-slider::after{transform:translateX(16px);}
+    /* NEW: Advanced Filter - compact multi-select dropdowns (Customer Status / Tags) */
+    .mc-dd-wrap{position:relative;display:inline-block;max-width:100%;}
+    .mc-dd-btn{display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:240px;max-width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:#fff;font-size:13px;cursor:pointer;text-align:left;}
+    .mc-dd-btn:hover{border-color:var(--primary-accent);}
+    .mc-dd-panel{position:absolute;left:0;top:calc(100% + 4px);z-index:60;min-width:270px;max-height:260px;overflow-y:auto;background:#fff;border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow-lg);padding:6px;}
+    .mc-dd-tools{display:flex;gap:14px;padding:4px 8px 6px;font-size:12px;font-weight:600;border-bottom:1px solid var(--border);margin-bottom:4px;}
+    .mc-dd-item{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:6px;font-size:13px;cursor:pointer;}
+    .mc-dd-item:hover{background:var(--neutral-bg);}
     /* NEW: Assigned Leads table + Lead details */
     .lead-note-cell{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;color:var(--text-2);}
     .lead-link{cursor:pointer;color:var(--primary-accent);font-weight:600;}
@@ -145,6 +153,14 @@
     .conv-badge{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;background:#fdf2d8;color:#8a5a00;font-size:10.5px;font-weight:700;}
     .conv-history-card{border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;}
     .conv-history-card:last-child{margin-bottom:0;}
+    /* NEW: Convert Lead - "Select Customer Details to Save" */
+    .conv-fields-title{font-size:13px;font-weight:700;margin:0 0 4px;}
+    .conv-fields-hint{font-size:11.5px;color:var(--text-2);margin:0 0 8px;}
+    .conv-field-row{border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:6px;}
+    .conv-field-row .cfr-label{font-weight:700;font-size:12.5px;margin-bottom:4px;}
+    .conv-field-row .cfr-lead{display:flex;align-items:flex-start;gap:7px;font-size:12.5px;cursor:pointer;word-break:break-word;}
+    .conv-field-row .cfr-lead.off{color:var(--text-3);cursor:default;}
+    .conv-field-row .cfr-cust{font-size:12.5px;color:var(--text-2);margin:3px 0 0 24px;word-break:break-word;}
 
     table{width:100%;border-collapse:collapse;font-size:13px;}
     thead th{text-align:left;padding:10px 12px;color:var(--text-3);font-weight:700;text-transform:uppercase;font-size:10.5px;border-bottom:1px solid var(--border);white-space:nowrap;}
@@ -163,6 +179,7 @@
       .order-card .oc-actions{display:flex;gap:8px;margin-top:10px;}
       .order-card .oc-actions .icon-btn{flex:1;text-align:center;}
       #mcList table{display:none;}
+      #mlList table{display:none;}   /* NEW - leads: table hidden on mobile, card list (same as My Customers) shown instead */
       .customers-mobile-cards{display:block;}
       .customer-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:10px;box-shadow:var(--shadow-sm);}
       .customer-card .cc-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;cursor:pointer;}
@@ -316,7 +333,7 @@ let ETOKEN = sessionStorage.getItem('employee_token') || null;
 let EMP_NAME = sessionStorage.getItem('employee_name') || '';
 let MY_CUSTOMERS_CACHE = [];
 let MC_LOADED_ = false; // NEW - true after the first successful My Customers fetch
-let MC_ADV_ = { active:false, days:15, types:[], status:'has' }; // NEW - applied Advanced Filter
+let MC_ADV_ = { active:false, days:15, types:[], status:'has', statuses:[], tags:[] }; // NEW - applied Advanced Filter (statuses, tags: NEW)
 const MC_ADV_TYPES_ = [['visit','Visit'],['sale','Sale'],['payment','Payment'],['order','Order']];
 let MC_LAST_LIST_ = [];   // NEW - the customer list currently shown (used by Share)
 let MC_SHARE_MSGS_ = [];  // NEW - prepared WhatsApp message parts
@@ -374,10 +391,10 @@ function employeeLogout(){
   MY_CUSTOMERS_CACHE = []; MC_LOADED_ = false; // NEW - next login fetches fresh once
   MC_LAST_LIST_ = []; MC_SHARE_MSGS_ = [];
   EMP_DASH_LOADED_ = false; ORDERS_LOADED_ = false; ATT_STATUS_LOADED_ = false; ATT_HIST_LOADED_ = false; // NEW
-  MC_ADV_ = { active:false, days:15, types:[], status:'has' };
+  MC_ADV_ = { active:false, days:15, types:[], status:'has', statuses:[], tags:[] };
   if(ATTENDANCE_TIMER_){ clearInterval(ATTENDANCE_TIMER_); ATTENDANCE_TIMER_ = null; }
   // NEW - Shop View cleanup so a stale map never leaks into the next login
-  SHOP_VIEW_CACHE = []; SHOP_VIEW_LOADED_ = false;
+  SHOP_VIEW_CACHE = []; SHOP_VIEW_LOADED_ = false; SV_MODE_ = 'customers';
   if(SHOP_MAP_){ SHOP_MAP_.remove(); SHOP_MAP_ = null; }
   q('#appShell').style.display='none'; q('#loginScreen').style.display='flex';
 }
@@ -489,6 +506,8 @@ function mcSortArrow_(key){ return MC_SORT_.key===key ? (MC_SORT_.dir===1?' ▲'
 let MC_MODE_ = 'customers';   // 'customers' | 'leads'
 let MY_LEADS_CACHE = [];
 let MY_LEADS_LOADED_ = false;
+let ML_ADV_ = { active:false, statuses:[] };   // NEW - Lead Advanced Filter (multi-status, OR)
+let ML_LAST_LIST_ = [];                         // NEW - exactly what's on screen right now
 
 function toggleMcMode_(on){
   MC_MODE_ = on ? 'customers' : 'leads';
@@ -509,8 +528,12 @@ function applyMcMode_(){
 function renderMyLeads_(forceReload){
   const box = q('#mcLeadBox'); if(!box) return;
   box.innerHTML =
-    '<div class="filters-bar"><input type="text" id="mlSearch" placeholder="Search lead..." oninput="paintMyLeads_()"></div>' +
+    '<div class="filters-bar"><input type="text" id="mlSearch" placeholder="Search lead..." oninput="paintMyLeads_()">' +
+      '<button class="btn btn-ghost" id="mlAdvBtn" style="white-space:nowrap;" onclick="toggleMlAdvPanel_()">&#9660; Advanced Filter</button></div>' +
+    mlAdvPanelHtml_() +
+    '<div id="mlAdvSummary" class="hidden" style="font-size:12.5px;color:var(--primary-accent);background:var(--primary-light);padding:8px 12px;border-radius:var(--radius-sm);margin:0 0 12px;"></div>' +
     '<div class="table-scroll" id="mlList"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>';
+  paintMlAdvBtn_();
   if(MY_LEADS_LOADED_ && !forceReload) paintMyLeads_();
   google.script.run
     .withSuccessHandler(function(list){ MY_LEADS_CACHE = list || []; MY_LEADS_LOADED_ = true; paintMyLeads_(); })
@@ -521,14 +544,17 @@ function paintMyLeads_(){
   const host = q('#mlList'); if(!host) return;
   const term = (q('#mlSearch') ? q('#mlSearch').value : '').toLowerCase();
   const list = MY_LEADS_CACHE.filter(function(l){
-    if(!term) return true;
-    return String(l.name||'').toLowerCase().indexOf(term)!==-1 ||
-           String(l.phoneNo||'').indexOf(term)!==-1 ||
-           String(l.leadId||'').toLowerCase().indexOf(term)!==-1 ||
-           String(l.area||'').toLowerCase().indexOf(term)!==-1;
+    if(term && String(l.name||'').toLowerCase().indexOf(term)===-1 &&
+       String(l.phoneNo||'').indexOf(term)===-1 &&
+       String(l.leadId||'').toLowerCase().indexOf(term)===-1 &&
+       String(l.area||'').toLowerCase().indexOf(term)===-1) return false;
+    // NEW: Advanced Filter - multi-status OR match
+    if(ML_ADV_.active && ML_ADV_.statuses.indexOf(String(l.status||'').trim())===-1) return false;
+    return true;
   });
+  ML_LAST_LIST_ = list; // NEW - exactly what's currently visible (search + filter applied)
   if(!list.length){ host.innerHTML = '<div class="empty-state">No assigned leads found.</div>'; return; }
-  host.innerHTML = '<table><thead><tr><th>Lead</th><th style="width:130px">Action</th><th>Area</th><th>Last Activity Date</th><th>Notes (Last Notes)</th><th>Status</th></tr></thead><tbody>' +
+  const leadsTableHtml = '<table><thead><tr><th>Lead</th><th style="width:170px">Action</th><th>Area</th><th>Last Activity Date</th><th>Notes (Last Notes)</th><th>Status</th></tr></thead><tbody>' +
     list.map(function(l){
       const lid = esc(l.leadId);
       const note = String(l.lastNote||'');
@@ -537,13 +563,199 @@ function paintMyLeads_(){
         '<td style="white-space:nowrap;">' +
           '<button class="icon-btn" title="Call" onclick="callLead_(\''+esc(l.phoneNo||'')+'\',\''+lid+'\')">📞</button> ' +
           '<button class="icon-btn" title="Edit Lead" onclick="openLeadEditModal_(\''+lid+'\')">✏️</button> ' +
-          '<button class="icon-btn add-visit" title="Add Note" onclick="openLeadNoteModal_(\''+lid+'\',\''+esc(l.name||'')+'\')">+</button>' +
+          '<button class="icon-btn add-visit" title="Add Note" onclick="openLeadNoteModal_(\''+lid+'\',\''+esc(l.name||'')+'\')">+</button> ' +
+          leadLocationBtn_(l) +
         '</td>' +
         '<td>'+esc(l.area||'—')+'</td>' +
         '<td>'+esc(l.lastActivityDate||'—')+'</td>' +
         '<td class="lead-note-cell" title="'+esc(note)+'" onclick="showLeadNote_(\''+lid+'\')">'+(shortNote ? esc(shortNote) : '—')+'</td>' +
         '<td><span class="lead-status'+(l._stSaving?' saving':'')+'" title="Change status" onclick="event.stopPropagation();openLeadStatusMenu_(this,\''+lid+'\')">'+esc(leadStatusLabel_(l.status))+' <span style="font-size:9px;">&#9662;</span></span></td></tr>';
     }).join('') + '</tbody></table>';
+  // NEW: mobile card list - same layout as My Customers (visible only under 640px; table is hidden there by CSS)
+  const leadsCardsHtml = '<div class="customers-mobile-cards">' +
+    list.map(function(l){
+      const lid = esc(l.leadId);
+      const noteTxt = String(l.lastNote||'');
+      const shortNote = noteTxt.length > 40 ? noteTxt.substring(0,40)+'...' : noteTxt;
+      return '<div class="customer-card">' +
+        '<div class="cc-top" onclick="openLeadDetail_(\''+lid+'\')"><span class="cc-title">'+esc(l.name||'—')+'</span>' +
+          '<span class="lead-status'+(l._stSaving?' saving':'')+'" title="Change status" onclick="event.stopPropagation();openLeadStatusMenu_(this,\''+lid+'\')">'+esc(leadStatusLabel_(l.status))+' <span style="font-size:9px;">&#9662;</span></span></div>' +
+        '<div class="cc-row"><span>Area</span><span>'+esc(l.area||'—')+'</span></div>' +
+        '<div class="cc-row"><span>Phone</span><span>'+esc(l.phoneNo||'—')+'</span></div>' +
+        '<div class="cc-row"><span>Last Activity</span><span>'+esc(l.lastActivityDate||'—')+'</span></div>' +
+        '<div class="cc-row"><span>Last Note</span><span style="max-width:60%;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;" title="'+esc(noteTxt)+'" onclick="showLeadNote_(\''+lid+'\')">'+(shortNote ? esc(shortNote) : '—')+'</span></div>' +
+        '<div class="cc-actions">' +
+          '<button class="icon-btn" title="Call" onclick="callLead_(\''+esc(l.phoneNo||'')+'\',\''+lid+'\')">📞</button> ' +
+          '<button class="icon-btn" title="Edit Lead" onclick="openLeadEditModal_(\''+lid+'\')">✏️</button> ' +
+          '<button class="icon-btn add-visit" title="Add Note" onclick="openLeadNoteModal_(\''+lid+'\',\''+esc(l.name||'')+'\')">+</button> ' +
+          leadLocationBtn_(l) +
+        '</div>' +
+      '</div>';
+    }).join('') + '</div>';
+  host.innerHTML = leadsTableHtml + leadsCardsHtml;
+}
+
+/* ================= LEADS: ADVANCED FILTER (multi-status, OR) + CSV + WhatsApp ================= */
+
+function mlAdvPanelHtml_(){
+  const lbl = 'display:block;font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:6px;';
+  const chips = LEAD_STATUSES_.filter(function(s){ return s!=='Unassign'; }).map(function(s){
+    const on = ML_ADV_.statuses.indexOf(s)>-1;
+    return '<label style="display:inline-flex;align-items:center;gap:7px;padding:8px 14px;border:1.5px solid var(--border);border-radius:999px;font-size:13px;font-weight:500;cursor:pointer;background:#fff;">' +
+      '<input type="checkbox" class="mlAdvCb" value="'+esc(s)+'" '+(on?'checked':'')+'> '+esc(s)+'</label>';
+  }).join('');
+  return '<div id="mlAdvPanel" class="hidden" style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin:0 0 12px;box-shadow:var(--shadow-sm);">' +
+    '<div style="font-size:11.5px;font-weight:700;letter-spacing:.08em;color:var(--text-2);margin-bottom:14px;">ADVANCED LEAD FILTER - STATUS</div>' +
+    '<div style="margin-bottom:16px;"><label style="'+lbl+'">Status (select one or more - matches ANY selected)</label><div style="display:flex;gap:8px;flex-wrap:wrap;">'+chips+'</div></div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
+      '<button class="btn btn-primary" style="width:auto;" onclick="applyMlAdvFilter_()">Search / Apply Filter</button>' +
+      '<button class="btn btn-ghost" onclick="clearMlAdvFilter_()">Clear Filter</button>' +
+      '<button class="btn hidden" id="mlAdvShareBtn" title="Share filtered leads on WhatsApp" style="background:#25D366;color:#fff;" onclick="shareMlAdvFilterList_()">&#128994; Share</button>' +
+      '<button class="btn hidden" id="mlAdvCsvBtn" title="Download filtered leads as Excel" style="background:#1d6f42;color:#fff;" onclick="exportMlAdvFilterToCsv_()">&#11015; Excel</button>' +
+    '</div>' +
+  '</div>';
+}
+
+function toggleMlAdvPanel_(){
+  const p = q('#mlAdvPanel'); if(!p) return;
+  p.classList.toggle('hidden');
+  paintMlAdvBtn_();
+}
+
+function paintMlAdvBtn_(){
+  const btn = q('#mlAdvBtn'), panel = q('#mlAdvPanel'), sum = q('#mlAdvSummary');
+  if(!btn || !panel) return;
+  const open = !panel.classList.contains('hidden');
+  btn.innerHTML = (open ? '&#9650;' : '&#9660;') + ' Advanced Filter' +
+    (ML_ADV_.active ? ' <span style="background:var(--primary-accent);color:#fff;border-radius:999px;padding:1px 8px;font-size:11px;margin-left:4px;">ON</span>' : '');
+  const shareBtn = q('#mlAdvShareBtn');
+  if(shareBtn) shareBtn.classList.toggle('hidden', !ML_ADV_.active);
+  const csvBtn = q('#mlAdvCsvBtn');
+  if(csvBtn) csvBtn.classList.toggle('hidden', !ML_ADV_.active);
+  if(!sum) return;
+  if(ML_ADV_.active){
+    sum.innerHTML = '<strong>Filter:</strong> Status is ' + esc(ML_ADV_.statuses.join(', ')) +
+      ' <a href="#" onclick="clearMlAdvFilter_();return false;" style="margin-left:12px;font-weight:600;">Clear</a>' +
+      ' <a href="#" onclick="shareMlAdvFilterList_();return false;" style="margin-left:12px;font-weight:600;color:#128c4a;">Share</a>';
+    sum.classList.remove('hidden');
+  } else { sum.classList.add('hidden'); sum.innerHTML = ''; }
+}
+
+function applyMlAdvFilter_(){
+  const statuses = Array.prototype.slice.call(document.querySelectorAll('.mlAdvCb:checked')).map(function(cb){ return cb.value; });
+  if(!statuses.length){ showToast('Select at least one status.', 'err'); return; }
+  ML_ADV_ = { active:true, statuses:statuses };
+  q('#mlAdvPanel').classList.add('hidden');
+  paintMlAdvBtn_();
+  paintMyLeads_();
+}
+
+function clearMlAdvFilter_(){
+  ML_ADV_ = { active:false, statuses:[] };
+  document.querySelectorAll('.mlAdvCb').forEach(function(cb){ cb.checked = false; });
+  paintMlAdvBtn_();
+  paintMyLeads_();
+}
+
+let ML_SHARE_MSGS_ = [];
+function mlBuildSharePartsForWhatsApp_(){
+  const list = ML_LAST_LIST_ || [];
+  const DIV = '━━━━━━━━━━━━━━━━';
+  const term = q('#mlSearch') ? q('#mlSearch').value.trim() : '';
+
+  let headRest = DIV + '\n';
+  headRest += '*Filter - Status:* ' + ML_ADV_.statuses.join(', ') + '\n';
+  if(term) headRest += '*Search:* ' + term + '\n';
+  headRest += '*Prepared By:* ' + EMP_NAME + '\n';
+  headRest += '*Date:* ' + mcFmtDate_(Date.now()) + '\n';
+  headRest += '*Total Leads:* ' + list.length + '\n' + DIV + '\n\n';
+  const foot = '\nPlease follow up with the above leads accordingly.\nThank you.';
+
+  const blocks = list.map(function(l, i){
+    let b = '*' + (i+1) + '. ' + l.name + '*\n';
+    b += '*Phone:* ' + (l.phoneNo || 'Not available') + '\n';
+    b += '*Area:* ' + (l.area || 'Not available') + '\n';
+    b += '*Status:* ' + (l.status || 'Not available') + '\n';
+    return b;
+  });
+
+  const MAX = 5500;
+  const reserve = encodeURIComponent(headRest + foot).length + 80;
+  const groups = []; let cur = [], curLen = reserve;
+  blocks.forEach(function(b, i){
+    const l = encodeURIComponent(b + '\n').length;
+    if(cur.length && curLen + l > MAX){ groups.push(cur); cur = []; curLen = reserve; }
+    cur.push({ text: b, idx: i+1 }); curLen += l;
+  });
+  if(cur.length) groups.push(cur);
+
+  return groups.map(function(g, gi){
+    const title = '*LEAD LIST' + (groups.length>1 ? ' (Part ' + (gi+1) + ' of ' + groups.length + ')' : '') + '*\n';
+    return {
+      text: title + headRest + g.map(function(x){ return x.text; }).join('\n') + foot,
+      from: g[0].idx, to: g[g.length-1].idx
+    };
+  });
+}
+
+function shareMlAdvFilterList_(){
+  if(!ML_ADV_.active){ showToast('Apply an Advanced Filter first.', 'err'); return; }
+  if(!ML_LAST_LIST_.length){ showToast('No leads to share.', 'err'); return; }
+  ML_SHARE_MSGS_ = mlBuildSharePartsForWhatsApp_();
+  if(ML_SHARE_MSGS_.length === 1){ shareMlPart_(0); return; }
+  q('#modalHost').innerHTML =
+    '<div class="modal-overlay" onclick="if(event.target===this) closeModal()"><div class="modal">' +
+      '<div class="modal-head"><h3>Share on WhatsApp</h3><button class="modal-close" onclick="closeModal()">&times;</button></div>' +
+      '<div class="modal-body">' +
+        '<p style="margin:0 0 12px;font-size:13.5px;">'+ML_LAST_LIST_.length+' leads are split into '+ML_SHARE_MSGS_.length+' messages (WhatsApp link size limit). Send each part:</p>' +
+        ML_SHARE_MSGS_.map(function(m, i){
+          return '<button class="btn btn-primary" style="background:#25D366;border-color:#25D366;margin-bottom:8px;" onclick="shareMlPart_('+i+')">&#128994; Send Part '+(i+1)+' of '+ML_SHARE_MSGS_.length+' (leads '+m.from+'-'+m.to+')</button>';
+        }).join('') +
+      '</div>' +
+      '<div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">Close</button></div>' +
+    '</div></div>';
+}
+function shareMlPart_(i){
+  const m = ML_SHARE_MSGS_[i];
+  if(!m) return;
+  window.open('https://wa.me/?text=' + encodeURIComponent(m.text), '_blank');
+}
+
+function exportMlAdvFilterToCsv_(){
+  if(!ML_ADV_.active){ showToast('Apply an Advanced Filter first.', 'err'); return; }
+  const list = ML_LAST_LIST_ || [];
+  if(!list.length){ showToast('No leads to export.', 'err'); return; }
+
+  const term = q('#mlSearch') ? q('#mlSearch').value.trim() : '';
+  const cols = ['#','Lead Name','Lead ID','Phone','Area','Address','Status','Last Activity Date','Last Note'];
+  const rows = list.map(function(l, i){
+    return [i+1, l.name||'', l.leadId||'', l.phoneNo||'', l.area||'', l.address||'', l.status||'', l.lastActivityDate||'', l.lastNote||''];
+  });
+
+  const csvCell = function(v){
+    const s = String(v===undefined||v===null?'':v);
+    return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
+  };
+  const csvLine = function(arr){ return arr.map(csvCell).join(','); };
+  const lines = [];
+  lines.push(csvLine(['My Assigned Leads - Filtered List']));
+  lines.push(csvLine(['Filter - Status: '+ML_ADV_.statuses.join(', ')]));
+  if(term) lines.push(csvLine(['Search: '+term]));
+  lines.push(csvLine(['Prepared By: '+EMP_NAME+'   Date: '+mcFmtDate_(Date.now())+'   Total: '+list.length]));
+  lines.push('');
+  lines.push(csvLine(cols));
+  rows.forEach(function(r){ lines.push(csvLine(r)); });
+  const csv = lines.join('\r\n');
+
+  const blob = new Blob(['\ufeff'+csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'My_Leads_Filtered_' + mcFmtDate_(Date.now()).replace(/\s+/g,'_') + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 /* ---- NEW: Assigned Leads - call / notes / edit / details ---- */
@@ -556,8 +768,16 @@ function callLead_(phone, leadId){
   window.location.href = 'tel:'+m;
 }
 
+// NEW: 📍 Location icon for Leads - same pattern as My Customers.
+function leadLocationBtn_(l){
+  const hasLocation = isValidLatLong_(l.latLong);
+  return hasLocation
+    ? '<button class="icon-btn" title="Location" onclick="event.stopPropagation();openCustomerLocation_(\''+esc(l.latLong||'')+'\',\''+esc(l.address||'')+'\')">📍</button>'
+    : '<button class="icon-btn" title="Add Location" onclick="event.stopPropagation();openLeadEditModal_(\''+esc(l.leadId)+'\')">📍+</button>';
+}
+
 /* ---- NEW: Lead Status - 14 fixed values, click to change, saved silently ---- */
-const LEAD_STATUSES_ = ['New Lead','Contacted','No Response','Follow-up','Interested','Quotation Sent','Negotiation','Order Pending','Converted','Customer','Not Interested','Wrong Number','Fake Lead','Duplicate'];
+const LEAD_STATUSES_ = ['New Lead','Contacted','No Response','Follow-up','Interested','Quotation Sent','Negotiation','Order Pending','Converted','Customer','Not Interested','Wrong Number','Fake Lead','Duplicate','Unassign'];
 function leadStatusLabel_(s){ const t = String(s||'').trim(); return LEAD_STATUSES_.indexOf(t) !== -1 ? t : 'Set status'; }
 function findLeadInCache_(leadId){ return MY_LEADS_CACHE.filter(function(x){ return x.leadId === leadId; })[0]; }
 
@@ -594,6 +814,7 @@ function pickLeadStatus_(i){
   const prev = l.status;
   if(String(prev||'').trim() === status) return;
   if(status === 'Converted'){ openLeadConvertModal_(leadId, l.name); return; } // NEW - needs a linked customer first, never set directly
+  if(status === 'Unassign'){ unassignLead_(leadId, l.name); return; } // NEW - removes the lead from you entirely, not a stored status
   // 1) update the screen instantly (optimistic) - no reload, no navigation
   l.status = status; l._stSaving = true;
   delete LEAD_DETAIL_CACHE_[leadId];   // NEW - cached Lead 360 for this lead is now out of date
@@ -617,6 +838,25 @@ function pickLeadStatus_(i){
     })
     .apiEmployeeUpdateLeadStatus(ETOKEN, leadId, status);
 }
+
+// NEW: Unassign - removes the lead from "My Assigned Leads" entirely (does not touch Status/notes).
+function unassignLead_(leadId, leadName){
+  if(!confirm('Unassign "'+leadName+'" from yourself? It will disappear from your Assigned Leads list.')) return;
+  google.script.run
+    .withSuccessHandler(function(res){
+      if(res && res.success){
+        MY_LEADS_CACHE = MY_LEADS_CACHE.filter(function(x){ return x.leadId !== leadId; });
+        delete LEAD_DETAIL_CACHE_[leadId];
+        showToast('Lead unassigned.', 'ok');
+        paintMyLeads_();
+      } else {
+        showToast((res && res.message) || 'Could not unassign lead.', 'err');
+      }
+    })
+    .withFailureHandler(onEmployeeSessionError)
+    .apiEmployeeUnassignLead(ETOKEN, leadId);
+}
+
 /* ---- NEW: Convert Lead (Direct/Indirect + pick an EXISTING customer) ---- */
 let LC_LEAD_ID_ = '', LC_SELECTED_CID_ = '', LC_SEARCH_TIMER_ = null;
 function openLeadConvertModal_(leadId, leadName){
@@ -634,6 +874,7 @@ function openLeadConvertModal_(leadId, leadName){
         '</div>' +
         '<div class="field"><label>Select Existing Customer *</label><input type="text" id="lcSearch" placeholder="Search customer by name / mobile / area..." oninput="onLcSearch_()"></div>' +
         '<div class="conv-cust-list" id="lcCustList"><div class="skeleton"></div></div>' +
+        '<div id="lcFieldsBox" class="hidden" style="margin-top:14px;"></div>' +
         '<div class="field" style="margin-top:12px;"><label>Remark (optional)</label><textarea id="lcRemark" rows="2" placeholder="e.g. Existing shop owner, same as CUS26...0049"></textarea></div>' +
       '</div>' +
       '<div class="modal-actions"><button class="btn btn-primary" id="lcSaveBtn" onclick="saveLeadConvert_()">Convert</button><button class="btn btn-ghost" onclick="closeModal()">Cancel</button></div>' +
@@ -667,11 +908,55 @@ function selectLcCustomer_(customerId){
   LC_SELECTED_CID_ = customerId;
   Array.prototype.forEach.call(document.querySelectorAll('.conv-cust-row'), function(el){ el.classList.remove('selected'); });
   if(event && event.currentTarget) event.currentTarget.classList.add('selected');
+  loadLcCompare_();   // NEW - show Lead vs Customer values for the picked customer
+}
+
+/* ---- NEW: "Select Customer Details to Save" ---- */
+let LC_COMPARE_FOR_ = '';
+function lcShort_(v){ const s = String(v||''); return s.length > 60 ? s.substring(0,60)+'…' : s; }
+function lcTickAll_(on){
+  Array.prototype.forEach.call(document.querySelectorAll('.lcFieldCb:not(:disabled)'), function(cb){ cb.checked = on; });
+}
+function loadLcCompare_(){
+  const box = q('#lcFieldsBox'); if(!box) return;
+  const cid = LC_SELECTED_CID_, leadId = LC_LEAD_ID_;
+  LC_COMPARE_FOR_ = cid;
+  box.classList.remove('hidden');
+  box.innerHTML = '<div class="skeleton"></div>';
+  const saveBtn = q('#lcSaveBtn'); if(saveBtn) saveBtn.disabled = true;     // wait until the choices are on screen
+  const done = function(){ const b = q('#lcSaveBtn'); if(b) b.disabled = false; };
+  google.script.run
+    .withSuccessHandler(function(res){
+      if(LC_COMPARE_FOR_ !== cid || !q('#lcFieldsBox')) return;             // customer changed / modal closed meanwhile
+      done();
+      if(!res || !res.success){ box.innerHTML = '<div class="empty-state">'+esc((res && res.message) || 'Could not load details.')+'</div>'; return; }
+      box.innerHTML =
+        '<div class="conv-fields-title">Select Customer Details to Save</div>' +
+        '<p class="conv-fields-hint">Ticked = the Lead value is saved onto the customer. Unticked = the customer keeps its current value. <a href="#" onclick="lcTickAll_(true);return false;">All</a> &middot; <a href="#" onclick="lcTickAll_(false);return false;">None</a></p>' +
+        (res.fields||[]).map(function(f){
+          const leadV = String(f.lead||''), custV = String(f.customer||'');
+          const same = !!leadV && leadV === custV;
+          const canTick = !!leadV && !same;
+          const checked = canTick && !custV;      // pre-ticked only when it fills an EMPTY customer field
+          const leadTxt = !f.leadHasField ? 'not available on leads' : (!leadV ? '—' : esc(lcShort_(leadV)));
+          return '<div class="conv-field-row"><div class="cfr-label">'+esc(f.label)+'</div>' +
+            '<label class="cfr-lead'+(canTick?'':' off')+'"><input type="checkbox" class="lcFieldCb" value="'+esc(f.key)+'"'+(checked?' checked':'')+(canTick?'':' disabled')+'> ' +
+              '<span title="'+esc(leadV)+'">Lead: '+leadTxt+(same?' <em>(same as customer)</em>':'')+'</span></label>' +
+            '<div class="cfr-cust" title="'+esc(custV)+'">Customer: '+(custV ? esc(lcShort_(custV)) : '—')+'</div></div>';
+        }).join('');
+    })
+    .withFailureHandler(function(){
+      if(LC_COMPARE_FOR_ !== cid || !q('#lcFieldsBox')) return;
+      done();
+      box.innerHTML = '<div class="empty-state">Could not load details. You can still convert without copying any fields.</div>';
+    })
+    .apiEmployeeGetConversionCompare(ETOKEN, leadId, cid);
 }
 function saveLeadConvert_(){
   if(!LC_SELECTED_CID_){ showToast('Please select a customer to convert this lead to.', 'err'); return; }
   const type = (document.querySelector('input[name="lcType"]:checked') || {}).value || 'Direct';
   const remark = q('#lcRemark').value.trim();
+  const fields = Array.prototype.map.call(document.querySelectorAll('.lcFieldCb:checked'), function(cb){ return cb.value; }); // NEW - ticked fields
   const leadId = LC_LEAD_ID_;
   const btn = q('#lcSaveBtn'); btn.disabled=true; btn.textContent='Converting...';
   google.script.run
@@ -680,13 +965,13 @@ function saveLeadConvert_(){
       if(res && res.success){
         const cur = findLeadInCache_(leadId); if(cur) cur.status = 'Converted';
         delete LEAD_DETAIL_CACHE_[leadId];
-        showToast('Lead converted.', 'ok');
+        showToast(res.updatedFields ? ('Lead converted. '+res.updatedFields+' detail'+(res.updatedFields===1?'':'s')+' saved to customer.') : 'Lead converted.', 'ok');
         closeModal();
         paintMyLeads_();
       } else { showToast((res && res.message) || 'Failed to convert lead.', 'err'); }
     })
     .withFailureHandler(function(){ btn.disabled=false; btn.textContent='Convert'; showToast('Failed to convert lead.', 'err'); })
-    .apiEmployeeConvertLead(ETOKEN, leadId, LC_SELECTED_CID_, type, remark);
+    .apiEmployeeConvertLead(ETOKEN, leadId, LC_SELECTED_CID_, type, remark, fields);
 }
 
 document.addEventListener('click', function(e){ const m = q('#leadStatusMenu'); if(m && !m.contains(e.target)) closeLeadStatusMenu_(); });
@@ -774,8 +1059,9 @@ function renderLeadEditForm_(L, O, loading){
           '<div class="field"><label>Lead Status</label><select id="elStatus" '+(loading?'disabled':'')+'>' +
             (LEAD_STATUSES_.indexOf(String(L.status||'').trim())===-1 ? '<option value="" selected>— Select status —</option>' : '') +
             LEAD_STATUSES_.map(function(s){
-              // "Converted" needs a linked customer - only settable via the status badge's "Convert Lead" flow.
-              return '<option value="'+esc(s)+'"'+(s===String(L.status||'').trim()?' selected':'')+(s==='Converted'?' disabled':'')+'>'+esc(s)+(s==='Converted'?' (use status badge)':'')+'</option>';
+              // "Converted" and "Unassign" are only settable via the status badge, never from this form.
+              const special = (s==='Converted' || s==='Unassign');
+              return '<option value="'+esc(s)+'"'+(s===String(L.status||'').trim()?' selected':'')+(special?' disabled':'')+'>'+esc(s)+(special?' (use status badge)':'')+'</option>';
             }).join('') +
           '</select></div>' +
         '</div>' +
@@ -1080,10 +1366,15 @@ function mcAdvPanelHtml_(){
         '<option value="has"'+(MC_ADV_.status==='has'?' selected':'')+'>Has Activity</option>' +
         '<option value="none"'+(MC_ADV_.status==='none'?' selected':'')+'>No Activity</option>' +
       '</select></div>' +
+    // Customer Status: ONE compact dropdown, select one or more (matches ANY). Same checkbox class as before.
+    mcDdHtml_('mcAdvStatusDd', 'Customer Status', CUSTOMER_STATUSES_, MC_ADV_.statuses || [], 'mcAdvStatusCb', 'All statuses') +
+    // Tags: same dropdown logic (matches ANY of the selected tags)
+    mcDdHtml_('mcAdvTagDd', 'Tags', CUSTOMER_ALL_TAGS_, MC_ADV_.tags || [], 'mcAdvTagCb', 'All tags') +
     '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
       '<button class="btn btn-primary" style="width:auto;" onclick="applyMcAdvFilter_()">Search / Apply Filter</button>' +
       '<button class="btn btn-ghost" onclick="clearMcAdvFilter_()">Clear Filter</button>' +
       '<button class="btn hidden" id="mcAdvShareBtn" title="Share filtered customers on WhatsApp" style="background:#25D366;color:#fff;" onclick="shareMcAdvFilterList_()">&#128994; Share</button>' +
+      '<button class="btn hidden" id="mcAdvExcelBtn" title="Download filtered customers as Excel" style="background:#1d6f42;color:#fff;" onclick="exportMcAdvFilterToExcel_()">&#11015; Excel</button>' +
     '</div>' +
   '</div>';
 }
@@ -1096,7 +1387,10 @@ function toggleMcAdvPanel_(){
 
 function mcAdvSummaryText_(){
   const names = MC_ADV_TYPES_.filter(function(t){ return MC_ADV_.types.indexOf(t[0])>-1; }).map(function(t){ return t[1]; }).join(', ');
-  return (MC_ADV_.status==='has' ? 'Has activity' : 'No activity') + ' &middot; ' + names + ' &middot; last ' + MC_ADV_.days + ' day' + (MC_ADV_.days===1?'':'s');
+  let s = (MC_ADV_.status==='has' ? 'Has activity' : 'No activity') + ' &middot; ' + names + ' &middot; last ' + MC_ADV_.days + ' day' + (MC_ADV_.days===1?'':'s');
+  if(MC_ADV_.statuses && MC_ADV_.statuses.length) s += ' &middot; Status: ' + esc(MC_ADV_.statuses.join(', '));   // NEW
+  if(MC_ADV_.tags && MC_ADV_.tags.length) s += ' &middot; Tags: ' + esc(MC_ADV_.tags.join(', '));               // NEW
+  return s;
 }
 
 function paintMcAdvBtn_(){
@@ -1107,6 +1401,8 @@ function paintMcAdvBtn_(){
     (MC_ADV_.active ? ' <span style="background:var(--primary-accent);color:#fff;border-radius:999px;padding:1px 8px;font-size:11px;margin-left:4px;">ON</span>' : '');
   const shareBtn = q('#mcAdvShareBtn');
   if(shareBtn) shareBtn.classList.toggle('hidden', !MC_ADV_.active);
+  const excelBtn = q('#mcAdvExcelBtn'); // NEW
+  if(excelBtn) excelBtn.classList.toggle('hidden', !MC_ADV_.active);
   if(!sum) return;
   if(MC_ADV_.active){
     sum.innerHTML = '<strong>Filter:</strong> ' + mcAdvSummaryText_() +
@@ -1119,19 +1415,24 @@ function paintMcAdvBtn_(){
 function applyMcAdvFilter_(){
   const days = parseInt(q('#mcAdvDays').value, 10);
   const types = Array.prototype.slice.call(document.querySelectorAll('.mcAdvCb:checked')).map(function(cb){ return cb.value; });
+  const statuses = Array.prototype.slice.call(document.querySelectorAll('.mcAdvStatusCb:checked')).map(function(cb){ return cb.value; }); // NEW
+  const tags = Array.prototype.slice.call(document.querySelectorAll('.mcAdvTagCb:checked')).map(function(cb){ return cb.value; });       // NEW
   if(!days || days < 1){ showToast('Enter the number of days (1 or more).', 'err'); return; }
   if(!types.length){ showToast('Select at least one activity type.', 'err'); return; }
-  MC_ADV_ = { active:true, days:days, types:types, status:q('#mcAdvStatus').value };
+  MC_ADV_ = { active:true, days:days, types:types, status:q('#mcAdvStatus').value, statuses:statuses, tags:tags };
   q('#mcAdvPanel').classList.add('hidden');
   paintMcAdvBtn_();
   paintMyCustomers_();
 }
 
 function clearMcAdvFilter_(){
-  MC_ADV_ = { active:false, days:15, types:[], status:'has' };
+  MC_ADV_ = { active:false, days:15, types:[], status:'has', statuses:[], tags:[] };
   if(q('#mcAdvDays')) q('#mcAdvDays').value = 15;
   if(q('#mcAdvStatus')) q('#mcAdvStatus').value = 'has';
   document.querySelectorAll('.mcAdvCb').forEach(function(cb){ cb.checked = false; });
+  document.querySelectorAll('.mcAdvStatusCb').forEach(function(cb){ cb.checked = false; }); // NEW
+  document.querySelectorAll('.mcAdvTagCb').forEach(function(cb){ cb.checked = false; });    // NEW
+  mcDdRefresh_('mcAdvStatusDd', 'mcAdvStatusCb'); mcDdRefresh_('mcAdvTagDd', 'mcAdvTagCb'); // NEW - dropdown buttons go back to "All ..."
   paintMcAdvBtn_();
   paintMyCustomers_();
 }
@@ -1142,8 +1443,59 @@ function mcAdvMatch_(c){
   const cutoff = d.getTime() - MC_ADV_.days * 86400000;
   const rawKey = { visit:'lastLogVisitRaw', sale:'lastSaleDateRaw', payment:'lastPaymentDateRaw', order:'lastOrderDateRaw' };
   const hasAny = MC_ADV_.types.some(function(t){ return (Number(c[rawKey[t]])||0) >= cutoff; });
-  return MC_ADV_.status==='has' ? hasAny : !hasAny;
+  const activityOk = MC_ADV_.status==='has' ? hasAny : !hasAny;
+  // NEW: optional Customer Status narrowing (OR among selected statuses)
+  if(MC_ADV_.statuses && MC_ADV_.statuses.length && MC_ADV_.statuses.indexOf(String(c.pipelineStatus||'').trim())===-1) return false;
+  // NEW: optional Tags narrowing (OR among selected tags - customer needs at least one of them)
+  if(MC_ADV_.tags && MC_ADV_.tags.length){
+    const ct = c.tags || [];
+    if(!MC_ADV_.tags.some(function(t){ return ct.indexOf(t) > -1; })) return false;
+  }
+  return activityOk;
 }
+
+/* ---- NEW: compact multi-select dropdown (used for Customer Status + Tags in the Advanced Filter) ---- */
+function mcDdText_(arr, emptyText){
+  if(!arr || !arr.length) return emptyText;
+  return arr.length <= 2 ? arr.join(', ') : (arr.length + ' selected');
+}
+function mcDdHtml_(id, label, items, selected, cbClass, emptyText){
+  const lbl = 'display:block;font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:6px;';
+  return '<div style="margin-bottom:16px;"><label style="'+lbl+'">'+esc(label)+'</label>' +
+    '<div class="mc-dd-wrap">' +
+      '<button type="button" class="mc-dd-btn" onclick="toggleMcDd_(\''+id+'\')"><span id="'+id+'Text">'+esc(mcDdText_(selected, emptyText))+'</span><span style="font-size:10px;">&#9662;</span></button>' +
+      '<div class="mc-dd-panel hidden" id="'+id+'" data-empty="'+esc(emptyText)+'">' +
+        '<div class="mc-dd-tools"><a href="#" onclick="mcDdAll_(\''+id+'\',\''+cbClass+'\',true);return false;">Select all</a><a href="#" onclick="mcDdAll_(\''+id+'\',\''+cbClass+'\',false);return false;">Clear</a></div>' +
+        items.map(function(s){
+          const on = (selected||[]).indexOf(s) > -1;
+          return '<label class="mc-dd-item"><input type="checkbox" class="'+cbClass+'" value="'+esc(s)+'" '+(on?'checked':'')+' onchange="mcDdRefresh_(\''+id+'\',\''+cbClass+'\')"> '+esc(s)+'</label>';
+        }).join('') +
+      '</div>' +
+    '</div></div>';
+}
+function toggleMcDd_(id){
+  const p = q('#'+id); if(!p) return;
+  const wasHidden = p.classList.contains('hidden');
+  Array.prototype.forEach.call(document.querySelectorAll('.mc-dd-panel'), function(x){ x.classList.add('hidden'); });
+  if(wasHidden) p.classList.remove('hidden');
+}
+function mcDdRefresh_(id, cbClass){
+  const p = q('#'+id), t = q('#'+id+'Text'); if(!p || !t) return;
+  const vals = Array.prototype.map.call(p.querySelectorAll('.'+cbClass+':checked'), function(cb){ return cb.value; });
+  t.textContent = mcDdText_(vals, p.getAttribute('data-empty') || 'All');
+}
+function mcDdAll_(id, cbClass, on){
+  const p = q('#'+id); if(!p) return;
+  Array.prototype.forEach.call(p.querySelectorAll('.'+cbClass), function(cb){ cb.checked = on; });
+  mcDdRefresh_(id, cbClass);
+}
+document.addEventListener('click', function(e){
+  if(e.target.closest && e.target.closest('.mc-dd-wrap')) return;
+  Array.prototype.forEach.call(document.querySelectorAll('.mc-dd-panel'), function(p){ p.classList.add('hidden'); });
+});
+document.addEventListener('keydown', function(e){
+  if(e.key === 'Escape') Array.prototype.forEach.call(document.querySelectorAll('.mc-dd-panel'), function(p){ p.classList.add('hidden'); });
+});
 
 /* ================= SHARE FILTERED CUSTOMER LIST (WhatsApp) ================= */
 
@@ -1245,6 +1597,175 @@ function shareMcPart_(i){
   window.open('https://wa.me/?text=' + encodeURIComponent(m.text), '_blank');
 }
 
+/* ---- NEW: Advanced Filter -> download the SAME filtered list as Excel (.xls) ---- */
+function mcXlEsc_(v){ return String(v===undefined||v===null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function exportMcAdvFilterToExcel_(){
+  if(!MC_ADV_.active){ showToast('Apply an Advanced Filter first.', 'err'); return; }
+  const list = MC_LAST_LIST_ || [];
+  if(!list.length){ showToast('No customers to export.', 'err'); return; }
+
+  const typeNames = MC_ADV_TYPES_.filter(function(t){ return MC_ADV_.types.indexOf(t[0])>-1; }).map(function(t){ return t[1]; }).join(', ');
+  const term = q('#mcSearch') ? q('#mcSearch').value.trim() : '';
+
+  const cols = ['#','Customer Name','Customer ID','Mobile','Area','Address','Visited Day','Status','Outstanding',
+    'Last Sale Date','Last Visit Logged','Last Payment Date','Last Order Date','Days Since Last Activity'];
+
+  const rows = list.map(function(c, i){
+    let latest = 0;
+    MC_ADV_.types.forEach(function(t){ const ms = Number(c[MC_ADV_RAWKEY_[t]])||0; if(ms>latest) latest = ms; });
+    return [
+      i+1, c.customerName||'', c.customerId||'', c.mobile||'', c.area||'', c.address||'', c.visitedDay||'', c.status||'',
+      Number(c.outstanding)||0,
+      c.lastSaleDate||'', (c.lastLogVisitRaw?mcFmtDate_(c.lastLogVisitRaw):''),
+      (c.lastPaymentDateRaw?mcFmtDate_(c.lastPaymentDateRaw):''), (c.lastOrderDateRaw?mcFmtDate_(c.lastOrderDateRaw):''),
+      latest ? mcDaysText_(mcDaysSince_(latest)) : ''
+    ];
+  });
+
+  // FIX: Excel's newer "format doesn't match extension" warning (and
+  // sometimes an outright failure to open) happens because the file was
+  // HTML content saved with a ".xls" name. A genuine CSV has no such
+  // mismatch - every spreadsheet program (Excel, Google Sheets, WPS,
+  // LibreOffice) opens it directly with zero warnings.
+  const csvCell = function(v){
+    const s = String(v===undefined||v===null?'':v);
+    return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
+  };
+  const csvLine = function(arr){ return arr.map(csvCell).join(','); };
+  const lines = [];
+  lines.push(csvLine(['My Customers - Filtered List']));
+  lines.push(csvLine(['Filter: '+(MC_ADV_.status==='has'?'Has Activity':'No Activity')+' - '+typeNames+' - last '+MC_ADV_.days+' day'+(MC_ADV_.days===1?'':'s')]));
+  if(term) lines.push(csvLine(['Search: '+term]));
+  if(MC_DAY_FILTER) lines.push(csvLine(['Visited Day: '+MC_DAY_FILTER]));
+  lines.push(csvLine(['Prepared By: '+EMP_NAME+'   Date: '+mcFmtDate_(Date.now())+'   Total: '+list.length]));
+  lines.push('');
+  lines.push(csvLine(cols));
+  rows.forEach(function(r){ lines.push(csvLine(r)); });
+  const csv = lines.join('\r\n');
+
+  const blob = new Blob(['\ufeff'+csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'My_Customers_Filtered_' + mcFmtDate_(Date.now()).replace(/\s+/g,'_') + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/* ---- NEW: Customer Status - same 14 values + same click-to-change UI as Lead Status ---- */
+const CUSTOMER_STATUSES_ = ['New Lead','Contacted','No Response','Follow-up','Interested','Quotation Sent','Negotiation','Order Pending','Converted','Customer','Not Interested','Wrong Number','Fake Lead','Duplicate'];
+function customerStatusLabel_(s){ const t = String(s||'').trim(); return CUSTOMER_STATUSES_.indexOf(t) !== -1 ? t : 'Set status'; }
+function findCustomerInCache_(cid){ return MY_CUSTOMERS_CACHE.filter(function(x){ return x.customerId === cid; })[0]; }
+
+let CS_MENU_CID_ = '';
+function closeCustStatusMenu_(){
+  const m = q('#custStatusMenu'); if(m) m.remove();
+  CS_MENU_CID_ = '';
+}
+function openCustStatusMenu_(el, cid){
+  const wasOpenFor = CS_MENU_CID_;
+  closeCustStatusMenu_();
+  if(wasOpenFor === cid) return;
+  const c = findCustomerInCache_(cid); if(!c) return;
+  CS_MENU_CID_ = cid;
+  const cur = String(c.pipelineStatus||'').trim();
+  const m = document.createElement('div');
+  m.id = 'custStatusMenu'; m.className = 'lead-status-menu';
+  m.innerHTML = CUSTOMER_STATUSES_.map(function(s, i){
+    return '<button type="button" class="'+(s===cur?'current':'')+'" onclick="pickCustStatus_('+i+')">'+esc(s)+'</button>';
+  }).join('');
+  document.body.appendChild(m);
+  const r = el.getBoundingClientRect();
+  const mh = m.offsetHeight, mw = m.offsetWidth;
+  let top = r.bottom + 4;
+  if(top + mh > window.innerHeight - 8) top = Math.max(8, r.top - mh - 4);
+  const left = Math.max(8, Math.min(r.left, window.innerWidth - mw - 8));
+  m.style.top = top + 'px'; m.style.left = left + 'px';
+}
+function pickCustStatus_(i){
+  const cid = CS_MENU_CID_, status = CUSTOMER_STATUSES_[i];
+  closeCustStatusMenu_();
+  const c = findCustomerInCache_(cid);
+  if(!c || !status) return;
+  const prev = c.pipelineStatus;
+  if(String(prev||'').trim() === status) return;
+  c.pipelineStatus = status; c._stSaving = true;
+  paintMyCustomers_();
+  google.script.run
+    .withSuccessHandler(function(res){
+      const cur = findCustomerInCache_(cid);
+      if(cur) cur._stSaving = false;
+      if(!(res && res.success)){
+        if(cur && cur.pipelineStatus === status) cur.pipelineStatus = prev;
+        showToast((res && res.message) || 'Could not update status.', 'err');
+      }
+      paintMyCustomers_();
+    })
+    .withFailureHandler(function(err){
+      const cur = findCustomerInCache_(cid);
+      if(cur){ cur._stSaving = false; if(cur.pipelineStatus === status) cur.pipelineStatus = prev; }
+      paintMyCustomers_();
+      onEmployeeSessionError(err);
+    })
+    .apiEmployeeUpdateCustomerStatus(ETOKEN, cid, status);
+}
+document.addEventListener('click', function(e){ const m = q('#custStatusMenu'); if(m && !m.contains(e.target)) closeCustStatusMenu_(); });
+document.addEventListener('keydown', function(e){ if(e.key === 'Escape') closeCustStatusMenu_(); });
+window.addEventListener('resize', closeCustStatusMenu_);
+document.addEventListener('scroll', function(e){ const m = q('#custStatusMenu'); if(m && e.target !== m && !m.contains(e.target)) closeCustStatusMenu_(); }, true);
+
+/* ---- NEW: Customer Auto-Tags - render chips + manual add/remove popover ---- */
+const CUSTOMER_ALL_TAGS_ = [
+  '🟢 Active','🔵 Regular Customer','🟢 Highly Active','🟤 New Customer','🟠 Payment Pending',
+  '⚪ No Recent Activity','🟡 Temporarily Inactive','🔴 Inactive Customer','🚫 Not Interested',
+  '⛔ Do Not Contact','🔄 Re-Activation Required','⭐ VIP Customer','💎 Premium Customer',
+  '🏆 High Value Customer','📈 Growing Customer','🔁 Reactivated Customer','💤 Dormant Customer'
+];
+function renderCustTagsCell_(c, cid){
+  const chips = (c.tags||[]).map(function(t){
+    return '<span style="display:inline-block;background:var(--neutral-bg,#f1f3f5);border:1px solid var(--border,#e4e7ec);border-radius:999px;padding:2px 8px;font-size:11px;font-weight:600;margin:2px 4px 2px 0;white-space:nowrap;">'+esc(t)+'</span>';
+  }).join('');
+  return '<div style="max-width:260px;">' + chips + '<button class="icon-btn" title="Manage Tags" onclick="event.stopPropagation();openCustTagManager_(\''+cid+'\')">🏷️+</button></div>';
+}
+function openCustTagManager_(cid){
+  const c = findCustomerInCache_(cid); if(!c) return;
+  const current = c.tags || [];
+  q('#modalHost').innerHTML =
+    '<div class="modal-overlay" onclick="if(event.target===this) closeModal()"><div class="modal">' +
+      '<div class="modal-head"><h3>Manage Tags</h3><button class="modal-close" onclick="closeModal()">&times;</button></div>' +
+      '<div class="modal-body">' +
+        '<p style="margin:0 0 12px;font-size:13.5px;">'+esc(c.customerName)+' — tap a tag to add or remove it. System-calculated tags can be overridden.</p>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:8px;">' +
+          CUSTOMER_ALL_TAGS_.map(function(t, i){
+            const on = current.indexOf(t) > -1;
+            return '<button type="button" class="btn '+(on?'btn-primary':'btn-ghost')+'" style="padding:6px 12px;font-size:12.5px;" onclick="toggleCustTag_(\''+cid+'\','+i+')">'+esc(t)+'</button>';
+          }).join('') +
+        '</div>' +
+      '</div>' +
+      '<div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">Close</button></div>' +
+    '</div></div>';
+}
+function toggleCustTag_(cid, tagIndex){
+  const c = findCustomerInCache_(cid); if(!c) return;
+  const tag = CUSTOMER_ALL_TAGS_[tagIndex];
+  const has = (c.tags||[]).indexOf(tag) > -1;
+  const action = has ? 'remove' : 'add';
+  google.script.run
+    .withSuccessHandler(function(res){
+      if(res && res.success){
+        c.tags = has ? (c.tags||[]).filter(function(t){ return t!==tag; }) : (c.tags||[]).concat([tag]);
+        openCustTagManager_(cid);
+        paintMyCustomers_();
+      } else {
+        showToast((res && res.message) || 'Could not update tag.', 'err');
+      }
+    })
+    .withFailureHandler(onEmployeeSessionError)
+    .apiEmployeeSetCustomerTag(ETOKEN, cid, tag, action);
+}
+
 function paintMyCustomers_(){
   const host = q('#mcList');
   if(!host) return;
@@ -1288,7 +1809,7 @@ function paintMyCustomers_(){
     '<th style="cursor:pointer" onclick="sortMyCustomers_(\'outstanding\')">Outstanding'+mcSortArrow_('outstanding')+'</th>' +
     '<th style="cursor:pointer" onclick="sortMyCustomers_(\'lastSaleDate\')">Last Sale'+mcSortArrow_('lastSaleDate')+'</th>' +
     '<th style="cursor:pointer" onclick="sortMyCustomers_(\'lastVisitDate\')">Last Visit'+mcSortArrow_('lastVisitDate')+'</th>' +
-    '<th>Visited Day</th></tr></thead><tbody>' +
+    '<th>Visited Day</th><th>Status</th><th>Tags</th></tr></thead><tbody>' +
     list.map(function(c){
       const cid = esc(c.customerId);
       return '<tr class="clickable"><td onclick="openCustomerProfile(\''+cid+'\')">'+esc(c.customerName)+'</td>' +
@@ -1297,6 +1818,8 @@ function paintMyCustomers_(){
         '<td onclick="openCustomerProfile(\''+cid+'\')">'+esc(c.lastSaleDate||'—')+'</td>' +
         '<td onclick="openCustomerProfile(\''+cid+'\')">'+esc(c.lastVisitDate||'—')+'</td>' +
         '<td style="cursor:pointer" title="Click to set" onclick="event.stopPropagation();openVisitedDayModal(\''+cid+'\',\''+esc(c.customerName)+'\',\''+esc(c.visitedDay||'')+'\')">'+esc(c.visitedDay||'Set day')+'</td>' +
+        '<td><span class="lead-status'+(c._stSaving?' saving':'')+'" title="Change status" onclick="event.stopPropagation();openCustStatusMenu_(this,\''+cid+'\')">'+esc(customerStatusLabel_(c.pipelineStatus))+' <span style="font-size:9px;">&#9662;</span></span></td>' +
+        '<td>' + renderCustTagsCell_(c, cid) + '</td>' +
         '</tr>';
     }).join('') + '</tbody></table>';
   // Mobile card list - shown only under 640px, no horizontal scroll needed.
@@ -1308,6 +1831,8 @@ function paintMyCustomers_(){
         '<div class="cc-row"><span>Last Sale</span><span>'+esc(c.lastSaleDate||'—')+'</span></div>' +
         '<div class="cc-row"><span>Last Visit</span><span>'+esc(c.lastVisitDate||'—')+'</span></div>' +
         '<div class="cc-row"><span>Visited Day</span><span onclick="event.stopPropagation();openVisitedDayModal(\''+cid+'\',\''+esc(c.customerName)+'\',\''+esc(c.visitedDay||'')+'\')" style="cursor:pointer;">'+esc(c.visitedDay||'Set day')+'</span></div>' +
+        '<div class="cc-row"><span>Status</span><span class="lead-status'+(c._stSaving?' saving':'')+'" onclick="event.stopPropagation();openCustStatusMenu_(this,\''+cid+'\')">'+esc(customerStatusLabel_(c.pipelineStatus))+' <span style="font-size:9px;">&#9662;</span></span></div>' +
+        '<div class="cc-row" style="align-items:flex-start;"><span>Tags</span>' + renderCustTagsCell_(c, cid) + '</div>' +
         '<div class="cc-actions">' + actionsHtml(c, cid) + '</div>' +
       '</div>';
     }).join('') + '</div>';
@@ -2306,12 +2831,16 @@ let SV_SAT_ON_ = false;
 let SV_OSM_LAYER_ = null;
 let SV_SAT_LAYER_ = null;
 let SV_ME_MARKER_ = null;
+let SV_MODE_ = 'customers';   // NEW - Shop View toggle: 'customers' (default) | 'leads'
 
 function renderShopView(){
   const main = q('#mainContent');
+  const svLeads_ = (SV_MODE_ === 'leads');
   main.innerHTML =
-    '<div class="page-header"><div><h2>🗺️ Shop View</h2><p>All your customers plotted on a map.</p></div></div>' +
-    '<div class="filters-bar"><input type="text" id="svSearch" placeholder="Search customer / shop..." oninput="svFilterMarkers_()" onkeydown="if(event.key===\'Enter\')svGoToFirstMatch_()"></div>' +
+    '<div class="page-header"><div><h2>🗺️ Shop View</h2><p>'+(svLeads_ ? 'Your assigned leads plotted on a map (Converted / Customer leads are hidden).' : 'All your customers plotted on a map.')+'</p></div>' +
+      '<label class="mc-toggle" title="ON = Customers, OFF = Leads"><span id="svToggleLbl">'+(svLeads_ ? 'LEADS' : 'CUSTOMERS')+'</span><input type="checkbox" id="svModeToggle"'+(svLeads_ ? '' : ' checked')+' onchange="toggleSvMode_(this.checked)"><span class="mc-slider"></span></label>' +
+    '</div>' +
+    '<div class="filters-bar"><input type="text" id="svSearch" placeholder="'+(svLeads_ ? 'Search lead...' : 'Search customer / shop...')+'" oninput="svFilterMarkers_()" onkeydown="if(event.key===\'Enter\')svGoToFirstMatch_()"></div>' +
     '<div id="shopViewMapWrap" class="shopview-map-wrap">' +
       '<div id="shopMap" class="shopview-map"></div>' +
       '<div class="sv-controls">' +
@@ -2320,12 +2849,14 @@ function renderShopView(){
         '<button class="sv-ctrl-btn" title="My current location" onclick="svLocateMe_()">📍 My Location</button>' +
         '<button class="sv-ctrl-btn" title="Fullscreen" onclick="toggleShopMapFullscreen_()">⛶ Fullscreen</button>' +
       '</div>' +
-      '<div class="sv-legend"><span>🔵 Shop</span><span>📍 You</span></div>' +
+      '<div class="sv-legend"><span>'+(svLeads_ ? '🟠 Lead' : '🔵 Shop')+'</span><span>📍 You</span></div>' +
       '<div id="svLoading" class="sv-loading">Loading map…</div>' +
     '</div>' +
-    '<div id="svEmpty" class="empty-state hidden">No customers with a saved location yet. Add a Lat,Long from My Customers first.</div>';
+    '<div id="svEmpty" class="empty-state hidden">'+(svLeads_ ? 'No assigned leads with a saved location yet (Converted / Customer leads are not shown). Add a Lat,Long from My Assigned Leads first.' : 'No customers with a saved location yet. Add a Lat,Long from My Customers first.')+'</div>';
 
   if(SHOP_MAP_){ SHOP_MAP_.remove(); SHOP_MAP_ = null; }
+
+  if(svLeads_){ svLoadLeadsMode_(); return; }   // NEW - Leads mode; Customers mode below is unchanged
 
   if(SHOP_VIEW_LOADED_){ svInitMap_(SHOP_VIEW_CACHE); return; }
 
@@ -2366,9 +2897,9 @@ function svInitMap_(list){
   SV_CLUSTER_ = L.markerClusterGroup({ maxClusterRadius:60 });
   SV_MARKERS_ = [];
   valid.forEach(function(c){
-    const icon = L.divIcon({ className:'sv-shop-icon', html:'🔵', iconSize:[22,22], iconAnchor:[11,11], popupAnchor:[0,-10] });
+    const icon = L.divIcon({ className:'sv-shop-icon', html:(c.isLead ? '🟠' : '🔵'), iconSize:[22,22], iconAnchor:[11,11], popupAnchor:[0,-10] });
     const marker = L.marker([c.lat, c.lng], { icon:icon });
-    marker.bindPopup(svPopupHtml_(c), { maxWidth:280 });
+    marker.bindPopup(c.isLead ? svLeadPopupHtml_(c) : svPopupHtml_(c), { maxWidth:280 });
     marker._svData = c;
     SV_CLUSTER_.addLayer(marker);
     SV_MARKERS_.push(marker);
@@ -2398,6 +2929,68 @@ function svPopupHtml_(c){
 }
 function svPopupRow_(label, value){
   return '<div class="sv-popup-row"><span class="k">'+esc(label)+'</span><span class="v">'+esc(value)+'</span></div>';
+}
+
+/* ---- NEW: Shop View - Customers / Leads toggle ---- */
+function toggleSvMode_(on){
+  if(q('#svLoading')){                       // map still loading - don't switch mid-flight
+    const t = q('#svModeToggle'); if(t) t.checked = (SV_MODE_ === 'customers');
+    showToast('Map is still loading…');
+    return;
+  }
+  SV_MODE_ = on ? 'customers' : 'leads';
+  renderShopView();
+}
+
+function svLoadLeadsMode_(){
+  if(MY_LEADS_LOADED_){ svInitMap_(svLeadMapItems_()); return; }
+  google.script.run
+    .withSuccessHandler(function(list){
+      MY_LEADS_CACHE = list || []; MY_LEADS_LOADED_ = true;
+      if(SV_MODE_ !== 'leads' || !q('#shopViewMapWrap')) return;   // user already moved on
+      svInitMap_(svLeadMapItems_());
+    })
+    .withFailureHandler(function(err){
+      onEmployeeSessionError(err);
+      const el = q('#svLoading'); if(el) el.textContent = 'Failed to load map.';
+    })
+    .apiEmployeeGetMyLeads(ETOKEN);
+}
+
+// Assigned leads that have a valid saved Lat,Long. Leads whose status is
+// Converted or Customer are NOT shown as lead markers. Fields are mapped to
+// the same names the existing map search uses (customerName / mobile / area).
+function svLeadMapItems_(){
+  return (MY_LEADS_CACHE || []).filter(function(l){
+    const st = String(l.status || '').trim();
+    return st !== 'Converted' && st !== 'Customer';
+  }).map(function(l){
+    const ll = String(l.latLong || '').replace(/\s+/g, '');
+    if(!isValidLatLong_(ll)) return null;
+    const p = ll.split(',');
+    return {
+      isLead: true, leadId: l.leadId, customerName: l.name || '', mobile: l.phoneNo || '',
+      area: l.area || '', address: l.address || '', status: l.status || '',
+      latLong: ll, lat: Number(p[0]), lng: Number(p[1]),
+      lastNote: l.lastNote || '', lastActivityDate: l.lastActivityDate || ''
+    };
+  }).filter(Boolean);
+}
+
+function svLeadPopupHtml_(c){
+  const note = String(c.lastNote || '');
+  return '<div class="sv-popup">' +
+    '<div class="sv-popup-title">'+esc(c.customerName)+'</div>' +
+    svPopupRow_('Phone', c.mobile||'—') +
+    svPopupRow_('Address', c.address||c.area||'—') +
+    svPopupRow_('Status', leadStatusLabel_(c.status)) +
+    svPopupRow_('Last Activity', c.lastActivityDate||'—') +
+    svPopupRow_('Last Note', note ? (note.length>80 ? note.substring(0,80)+'...' : note) : '—') +
+    '<div class="sv-popup-actions">' +
+      '<button class="btn btn-secondary" style="flex:1" onclick="openLeadDetail_(\''+esc(c.leadId)+'\')">View Lead</button>' +
+      '<button class="btn btn-ghost" style="flex:1" onclick="openCustomerLocation_(\''+esc(c.latLong)+'\',\''+esc(c.address||'')+'\')">Directions</button>' +
+    '</div>' +
+  '</div>';
 }
 
 function svToggleLayer_(){
