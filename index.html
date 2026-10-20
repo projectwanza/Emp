@@ -127,6 +127,24 @@
     .wa-opt{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;text-align:left;background:#fff;border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:11px 13px;margin-bottom:8px;cursor:pointer;}
     .wa-opt:hover{border-color:#25D366;background:#f0fdf4;}
     .mt-filter{padding:9px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:13px;background:#fff;}
+        /* NEW: My Tasks date filter (mobile friendly) + Task Report */
+    .mt-datebar{background:#fff;border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:14px;}
+    .mt-chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;-webkit-overflow-scrolling:touch;}
+    .mt-chip{flex:0 0 auto;padding:8px 14px;border:1.5px solid var(--border);border-radius:999px;background:#fff;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;}
+    .mt-chip.on{background:var(--primary-light);border-color:var(--primary-accent);color:var(--primary-accent);}
+    .mt-date-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;align-items:end;}
+    .mt-date-row label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:var(--text-2);}
+    .mt-date-row input[type=date],.mt-date-row select{min-height:42px;padding:9px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:16px;background:#fff;width:100%;box-sizing:border-box;}
+    .tr-sum{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;}
+    .tr-card{border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:12px;background:#fff;}
+    .tr-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 18px;margin-top:8px;}
+    .tr-kv{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;padding:4px 0;border-bottom:1px dashed var(--border);}
+    .tr-kv span{color:var(--text-2);}
+    .tr-kv b{text-align:right;word-break:break-word;font-weight:600;}
+    .tr-box{font-size:12.5px;background:var(--neutral-bg);border-radius:8px;padding:9px 10px;margin-top:8px;}
+    .tr-det{margin-top:8px;font-size:13px;}
+    .tr-det summary{cursor:pointer;font-weight:700;padding:6px 0;}
+    @media (max-width:640px){ .mt-date-row{grid-template-columns:1fr 1fr;} .tr-grid{grid-template-columns:1fr;} }
     /* NEW: Assigned Leads table + Lead details */
     .lead-note-cell{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;color:var(--text-2);}
     .lead-link{cursor:pointer;color:var(--primary-accent);font-weight:600;}
@@ -459,10 +477,158 @@ let MY_TASKS_CACHE = [], MT_LOADED_ = false, MT_TODAY_ = 0, MT_FILTER_ = 'due', 
 function findTaskInCache_(id){ return MY_TASKS_CACHE.filter(function(x){ return x.taskId === id; })[0]; }
 function mtIsDone_(t){ return t.status === 'Completed' || t.status === 'Resolved'; }
 
+/* ================= NEW: MY TASKS - DATE FILTER + TASK REPORT ================= */
+let MT_DATE_ = { preset:'', from:'', to:'', basis:'created' };
+let MT_REPORT_ = { rows:[], status:'', limit:40, meta:null };
+
+function mtDayMs_(s){ const m = String(s||'').match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? new Date(Number(m[1]), Number(m[2])-1, Number(m[3])).getTime() : 0; }
+function mtBaseToday_(){ const d = new Date(); d.setHours(0,0,0,0); return d.getTime(); }
+function mtAddDays_(ms, n){ const d = new Date(ms); d.setDate(d.getDate()+n); return d.getTime(); }
+function mtDateActive_(){ return !!(MT_DATE_.from || MT_DATE_.to); }
+
+// Created date (default), Due date, or both must fall inside the range. Works together with Status / Type / Search.
+function mtDateMatch_(t){
+  if(!mtDateActive_()) return true;
+  const from = MT_DATE_.from ? mtDayMs_(MT_DATE_.from) : 0;
+  const to = MT_DATE_.to ? mtDayMs_(MT_DATE_.to) + 86399999 : 0;
+  const inR = function(ms){ if(!ms) return false; if(from && ms < from) return false; if(to && ms > to) return false; return true; };
+  if(MT_DATE_.basis === 'due') return inR(t.dueAt);
+  if(MT_DATE_.basis === 'both') return inR(t.createdAt) && inR(t.dueAt);
+  return inR(t.createdAt);
+}
+function mtDateBarInner_(){
+  const chip = function(p, label){ return '<button type="button" class="mt-chip'+(MT_DATE_.preset===p?' on':'')+'" onclick="mtSetPreset_(\''+p+'\')">'+label+'</button>'; };
+  const bo = function(v, label){ return '<option value="'+v+'"'+(MT_DATE_.basis===v?' selected':'')+'>'+label+'</option>'; };
+  return '<div class="mt-chips">'+chip('today','Today')+chip('yesterday','Yesterday')+chip('last7','Last 7 Days')+chip('last30','Last 30 Days')+chip('custom','Custom Range')+'</div>' +
+    '<div class="mt-date-row">' +
+      '<label>Start Date<input type="date" id="mtFrom" value="'+esc(MT_DATE_.from)+'" onchange="mtDateInput_()"></label>' +
+      '<label>End Date<input type="date" id="mtTo" value="'+esc(MT_DATE_.to)+'" onchange="mtDateInput_()"></label>' +
+      '<label>Filter by<select id="mtDateBasis" onchange="mtDateBasis_(this.value)">'+bo('created','Created date')+bo('due','Due date')+bo('both','Created &amp; due date')+'</select></label>' +
+      '<button type="button" class="btn btn-ghost" style="width:auto;min-height:42px;" onclick="mtClearFilters_()">&#10006; Clear Filters</button>' +
+    '</div>';
+}
+function mtDateBarHtml_(){ return '<div class="mt-datebar" id="mtDateBar">'+mtDateBarInner_()+'</div>'; }
+function mtPaintDateBar_(){ const b = q('#mtDateBar'); if(b) b.innerHTML = mtDateBarInner_(); }
+function mtSetPreset_(p){
+  const T = mtBaseToday_();
+  MT_DATE_.preset = p;
+  if(p === 'today'){ MT_DATE_.from = MT_DATE_.to = mtDateStr_(T); }
+  else if(p === 'yesterday'){ MT_DATE_.from = MT_DATE_.to = mtDateStr_(mtAddDays_(T,-1)); }
+  else if(p === 'last7'){ MT_DATE_.from = mtDateStr_(mtAddDays_(T,-6)); MT_DATE_.to = mtDateStr_(T); }
+  else if(p === 'last30'){ MT_DATE_.from = mtDateStr_(mtAddDays_(T,-29)); MT_DATE_.to = mtDateStr_(T); }
+  mtPaintDateBar_(); paintMyTasks_();
+}
+function mtDateInput_(){
+  const a = q('#mtFrom'), b = q('#mtTo'); if(!a || !b) return;
+  let from = a.value, to = b.value;
+  if(from && to && from > to){ const x = from; from = to; to = x; showToast('Start date was after end date - swapped.', 'ok'); }
+  MT_DATE_.from = from; MT_DATE_.to = to; MT_DATE_.preset = 'custom';
+  mtPaintDateBar_(); paintMyTasks_();
+}
+function mtDateBasis_(v){ MT_DATE_.basis = v; paintMyTasks_(); }
+function mtClearFilters_(){
+  MT_DATE_ = { preset:'', from:'', to:'', basis:'created' };
+  MT_FILTER_ = 'due'; MT_RULE_ = '';
+  const s = q('#mtSearch'); if(s) s.value = '';
+  const f = q('#mtFilter'); if(f) f.value = 'due';
+  const r = q('#mtRule'); if(r) r.value = '';
+  mtPaintDateBar_(); paintMyTasks_();
+}
+
+/* ---- Task Report (uses the same Date / Type / Search filters; status filter is inside the report) ---- */
+function mtReportFilters_(){
+  return {
+    from: MT_DATE_.from ? mtDayMs_(MT_DATE_.from) : 0,
+    to: MT_DATE_.to ? mtDayMs_(MT_DATE_.to) + 86399999 : 0,
+    basis: MT_DATE_.basis, rule: MT_RULE_,
+    term: q('#mtSearch') ? q('#mtSearch').value : ''
+  };
+}
+function openTaskReport_(){
+  MT_REPORT_ = { rows:[], status:'', limit:40, meta:null };
+  q('#modalHost').innerHTML =
+    '<div class="modal-overlay" onclick="if(event.target===this) closeModal()"><div class="modal modal-wide" style="max-width:980px;">' +
+      '<div class="modal-head"><h3>&#128202; Task Report</h3><button class="modal-close" onclick="closeModal()">&times;</button></div>' +
+      '<div class="modal-body" id="trBody"><div class="skeleton" style="height:80px;"></div><div class="skeleton" style="height:160px;margin-top:10px;"></div></div>' +
+      '<div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">Close</button></div>' +
+    '</div></div>';
+  google.script.run
+    .withSuccessHandler(function(res){
+      if(!q('#trBody')) return;
+      if(!(res && res.success)){ q('#trBody').innerHTML = '<div class="empty-state">'+esc((res && res.message) || 'Could not load the report.')+'</div>'; return; }
+      MT_REPORT_.rows = res.rows || []; MT_REPORT_.meta = res;
+      paintTaskReport_();
+    })
+    .withFailureHandler(function(err){ if(q('#trBody')) q('#trBody').innerHTML = '<div class="empty-state">Could not load the report.</div>'; onEmployeeSessionError(err); })
+    .apiEmployeeGetTaskReport(ETOKEN, mtReportFilters_());
+}
+function paintTaskReport_(){
+  const host = q('#trBody'); if(!host) return;
+  const m = MT_REPORT_.meta || {}, c = m.counts || {};
+  const flt = [];
+  if(mtDateActive_()) flt.push((MT_DATE_.basis==='due' ? 'Due date' : (MT_DATE_.basis==='both' ? 'Created &amp; due date' : 'Created date'))+': '+esc(MT_DATE_.from||'...')+' &rarr; '+esc(MT_DATE_.to||'...'));
+  if(MT_RULE_) flt.push('Type: '+esc(MT_RULE_));
+  const term = q('#mtSearch') ? q('#mtSearch').value.trim() : ''; if(term) flt.push('Search: '+esc(term));
+  const st = ['Pending','Overdue','Completed','Automatically Resolved'];
+  host.innerHTML =
+    '<div class="tr-sum"><span class="mt-pill">Total '+esc(m.total||0)+'</span>' +
+      st.map(function(s){ return '<span class="mt-pill'+(s==='Overdue'?' due':(s==='Pending'?' soon':' done'))+'">'+esc(s)+' '+esc(c[s]||0)+'</span>'; }).join('') + '</div>' +
+    '<div class="mt-sub">'+(flt.length ? 'Filters &middot; '+flt.join(' &middot; ') : 'Filters &middot; none (all your tasks)')+' &middot; Generated '+esc(m.generatedText||'')+'</div>' +
+    (m.truncated ? '<div class="mt-sub" style="color:#b42318;">Showing the latest '+esc(m.shown)+' of '+esc(m.total)+' tasks. Narrow the date range to see the rest.</div>' : '') +
+    '<div style="margin:10px 0;"><select class="mt-filter" id="trStatus" onchange="MT_REPORT_.status=this.value;MT_REPORT_.limit=40;paintTaskReportList_()">' +
+      '<option value="">All statuses</option>' + st.map(function(s){ return '<option value="'+s+'"'+(MT_REPORT_.status===s?' selected':'')+'>'+s+'</option>'; }).join('') +
+    '</select></div><div id="trList"></div>';
+  paintTaskReportList_();
+}
+function paintTaskReportList_(){
+  const host = q('#trList'); if(!host) return;
+  const rows = MT_REPORT_.rows.filter(function(r){ return !MT_REPORT_.status || r.statusLabel === MT_REPORT_.status; });
+  if(!rows.length){ host.innerHTML = '<div class="empty-state">No tasks match these filters.</div>'; return; }
+  const shown = rows.slice(0, MT_REPORT_.limit);
+  host.innerHTML = shown.map(trCard_).join('') +
+    (rows.length > shown.length ? '<button type="button" class="btn btn-ghost" style="width:100%;" onclick="MT_REPORT_.limit+=40;paintTaskReportList_()">Show more ('+(rows.length-shown.length)+' remaining)</button>' : '');
+}
+function trCard_(r){
+  const dash = function(v){ return (v===undefined||v===null||v==='') ? '—' : esc(v); };
+  const kv = function(k, v){ return '<div class="tr-kv"><span>'+k+'</span><b>'+v+'</b></div>'; };
+  const pill = function(s){ return '<span class="mt-pill '+(s==='Overdue'?'due':(s==='Pending'?'soon':'done'))+'">'+esc(s)+'</span>'; };
+  const ev = function(e){ return '<div class="lt-item"><div class="lt-time">'+dash(e.dateTime)+'</div>'+(e.label?'<span class="lt-tag">'+esc(e.label)+'</span>':'')+(e.text?'<div class="lt-text">'+esc(e.text)+'</div>':'')+(e.by?'<div class="lt-by">by '+esc(e.by)+'</div>':'')+'</div>'; };
+  const list = function(items, empty){ return (items && items.length) ? '<div class="lead-timeline">'+items.map(ev).join('')+'</div>' : '<div class="mt-sub">'+empty+'</div>'; };
+  const f = r.finance;
+  const fin = f
+    ? kv('Last Sale', dash(f.lastSaleText)) + kv('Last Payment', dash(f.lastPaymentText)) + kv('Last Credit Note', dash(f.lastCreditNoteText)) +
+      kv('Outstanding (current)', money(f.outstanding)) +
+      kv('Overdue (current)', f.overdue>0 ? money(f.overdue)+(f.oldestOverdueText ? ' &middot; oldest due '+esc(f.oldestOverdueText)+' ('+esc(f.overdueDays)+'d)' : '') : '—')
+    : kv('Last Sale / Payment / Credit Note', '—') + kv('Outstanding / Overdue', '—');
+  const method = r.completionMethod
+    ? kv('Completion method', esc(r.completionMethod)) +
+      (r.completionReason ? kv('Completion reason', esc(r.completionReason)) : '') +
+      (r.completionNote ? kv('Completion note', esc(r.completionNote)) : '')
+    : kv('Completion method', '—');
+  return '<div class="tr-card">' +
+    '<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start;">' +
+      '<div><div style="font-weight:700;font-size:14px;">'+dash(r.entityName)+(r.entityType==='Lead'?' <span class="mt-pill">Lead</span>':'')+'</div>' +
+      '<div class="mt-sub">&#128222; '+dash(r.phone)+' &middot; '+esc(r.entityType)+' ID: '+dash(r.entityId)+'</div></div>' +
+      pill(r.statusLabel) +
+    '</div>' +
+    '<div class="tr-grid">' +
+      kv('Task ID', dash(r.taskId)) + kv('Task type', dash(r.ruleName)) + kv('Task title', dash(r.title)) + kv('Assigned to', dash(r.assignedName)) +
+      kv('Created', dash(r.createdText)) + kv('Due date', dash(r.dueText)) + kv('Completed', dash(r.completedText)) + kv('Status', esc(r.statusLabel)) +
+      fin + method +
+    '</div>' +
+    '<div class="tr-box"><b>Why this task was generated:</b> '+esc(r.reason)+'</div>' +
+    '<div class="tr-box"><b>Latest note:</b> '+(r.latestNote ? esc(r.latestNote)+'<div class="mt-sub">'+(r.latestNoteBy?esc(r.latestNoteBy)+' &middot; ':'')+dash(r.latestNoteTime)+(r.latestNoteSource?' &middot; '+esc(r.latestNoteSource):'')+'</div>' : '—')+'</div>' +
+    '<details class="tr-det"><summary>&#128172; WhatsApp messages ('+esc(r.waCount||0)+')</summary>'+list(r.wa, 'No WhatsApp message opened for this task.')+'</details>' +
+    '<details class="tr-det"><summary>&#9200; Snooze / reschedule history ('+esc((r.reschedules||[]).length)+')</summary>'+list(r.reschedules, 'No reschedule recorded.')+'</details>' +
+    '<details class="tr-det"><summary>&#128221; Task history ('+esc((r.timeline||[]).length)+')</summary>'+list(r.timeline, 'No history.')+'</details>' +
+    '<details class="tr-det"><summary>&#128451; Customer / Lead notes &amp; activity ('+esc((r.activity||[]).length)+')</summary>'+list(r.activity, 'No notes or activity yet.')+'</details>' +
+  '</div>';
+}
+
 function renderMyTasks(forceReload){
   const main = q('#mainContent');
   main.innerHTML =
-    '<div class="page-header"><div><h2>My Tasks</h2><p>Follow-ups assigned to you.</p></div></div>' +
+    '<div class="page-header"><div><h2>My Tasks</h2><p>Follow-ups assigned to you.</p></div><button type="button" class="btn btn-primary" style="width:auto;" onclick="openTaskReport_()">&#128202; Task Report</button></div>' +
     '<div class="filters-bar">' +
       '<input type="text" id="mtSearch" placeholder="Search customer / lead..." oninput="paintMyTasks_()">' +
       '<select class="mt-filter" id="mtFilter" onchange="MT_FILTER_=this.value;paintMyTasks_()">' +
@@ -478,6 +644,7 @@ function renderMyTasks(forceReload){
         }).join('') +
       '</select>' +
     '</div>' +
+    mtDateBarHtml_() +
     '<div class="table-scroll" id="mtList"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>';
   if(MT_LOADED_ && !forceReload) paintMyTasks_();
   refreshMyTasksSilently_();
@@ -527,6 +694,7 @@ function paintMyTasks_(){
   const term = (q('#mtSearch') ? q('#mtSearch').value : '').toLowerCase();
   const all = MY_TASKS_CACHE.filter(function(t){
     if(MT_RULE_ && t.rule !== MT_RULE_) return false;
+    if(!mtDateMatch_(t)) return false;
     if(term && String(t.entityName||'').toLowerCase().indexOf(term)===-1 && String(t.phone||'').indexOf(term)===-1) return false;
     return true;
   });
@@ -547,7 +715,7 @@ function paintMyTasks_(){
     }).sort(function(a,b){ return a.task.dueAt - b.task.dueAt; });
   }
   if(!rows.length){
-    host.innerHTML = '<div class="empty-state">'+(MT_FILTER_==='completed' ? 'No completed tasks yet.' : 'No tasks here. Nice work!')+'</div>';
+    host.innerHTML = '<div class="empty-state">'+(mtDateActive_() ? 'No tasks match the selected filters.' : (MT_FILTER_==='completed' ? 'No completed tasks yet.' : 'No tasks here. Nice work!'))+'</div>';
     return;
   }
   const cell = function(r){
