@@ -2258,8 +2258,10 @@ function exportMcAdvFilterToExcel_(){
 }
 
 /* ---- NEW: Customer Status - same 14 values + same click-to-change UI as Lead Status ---- */
-const CUSTOMER_STATUSES_ = ['New Lead','Contacted','No Response','Follow-up','Interested','Quotation Sent','Negotiation','Order Pending','Converted','Customer','Not Interested','Wrong Number','Fake Lead','Duplicate'];
-function customerStatusLabel_(s){ const t = String(s||'').trim(); return CUSTOMER_STATUSES_.indexOf(t) !== -1 ? t : 'Set status'; }
+const CUSTOMER_STATUSES_ = ['New Customer','Active Customer','Regular Customer','VIP / High Value','Declining Customer','Credit Overdue','Inactive Customer','Re-Activation Required','Closure Expected','Temporarily Closed','Permanently Closed','Business Shifted','Owner Changed','Unreachable','Do Not Contact','Not Interested','Seasonal Customer','Credit Hold'];
+// Purane saved statuses (e.g. Interested / Wrong Number) jo sheet me pehle se hain - unhe bhi label me dikhate rahenge, kuch gayab nahi hoga
+const CUSTOMER_STATUSES_LEGACY_ = ['New Lead','Contacted','No Response','Follow-up','Interested','Quotation Sent','Negotiation','Order Pending','Converted','Customer','Wrong Number','Fake Lead','Duplicate'];
+function customerStatusLabel_(s){ const t = String(s||'').trim(); return (CUSTOMER_STATUSES_.indexOf(t) !== -1 || CUSTOMER_STATUSES_LEGACY_.indexOf(t) !== -1) ? t : 'Set status'; }
 function findCustomerInCache_(cid){ return MY_CUSTOMERS_CACHE.filter(function(x){ return x.customerId === cid; })[0]; }
 
 let CS_MENU_CID_ = '';
