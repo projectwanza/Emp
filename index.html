@@ -144,7 +144,17 @@
     .tr-box{font-size:12.5px;background:var(--neutral-bg);border-radius:8px;padding:9px 10px;margin-top:8px;}
     .tr-det{margin-top:8px;font-size:13px;}
     .tr-det summary{cursor:pointer;font-weight:700;padding:6px 0;}
-    @media (max-width:640px){ .mt-date-row{grid-template-columns:1fr 1fr;} .tr-grid{grid-template-columns:1fr;} }
+    @media (max-width:640px){
+      /* Date range: Start | End on row 1, Filter by | Clear Filters on row 2 - nothing can overflow the screen */
+      .mt-date-row{grid-template-columns:repeat(2,minmax(0,1fr));}
+      .mt-date-row label{min-width:0;}
+      .mt-date-row input[type=date],.mt-date-row select{min-width:0;max-width:100%;}
+      .mt-date-row .btn{width:100%;}
+      .tr-grid{grid-template-columns:1fr;}
+      /* Search = full row; Due/Pending + All task types = SAME row, equal width */
+      #mtSearch{flex:1 1 100%;min-width:0;}
+      .filters-bar .mt-filter{flex:1 1 0;min-width:0;}
+    }
     /* NEW: Assigned Leads table + Lead details */
     .lead-note-cell{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;color:var(--text-2);}
     .lead-link{cursor:pointer;color:var(--primary-accent);font-weight:600;}
@@ -497,14 +507,12 @@ function mtDateMatch_(t){
   return inR(t.createdAt);
 }
 function mtDateBarInner_(){
-  const chip = function(p, label){ return '<button type="button" class="mt-chip'+(MT_DATE_.preset===p?' on':'')+'" onclick="mtSetPreset_(\''+p+'\')">'+label+'</button>'; };
   const bo = function(v, label){ return '<option value="'+v+'"'+(MT_DATE_.basis===v?' selected':'')+'>'+label+'</option>'; };
-  return '<div class="mt-chips">'+chip('today','Today')+chip('yesterday','Yesterday')+chip('last7','Last 7 Days')+chip('last30','Last 30 Days')+chip('custom','Custom Range')+'</div>' +
-    '<div class="mt-date-row">' +
+  return '<div class="mt-date-row">' +
       '<label>Start Date<input type="date" id="mtFrom" value="'+esc(MT_DATE_.from)+'" onchange="mtDateInput_()"></label>' +
       '<label>End Date<input type="date" id="mtTo" value="'+esc(MT_DATE_.to)+'" onchange="mtDateInput_()"></label>' +
       '<label>Filter by<select id="mtDateBasis" onchange="mtDateBasis_(this.value)">'+bo('created','Created date')+bo('due','Due date')+bo('both','Created &amp; due date')+'</select></label>' +
-      '<button type="button" class="btn btn-ghost" style="width:auto;min-height:42px;" onclick="mtClearFilters_()">&#10006; Clear Filters</button>' +
+      '<button type="button" class="btn btn-ghost" style="width:100%;min-height:42px;" onclick="mtClearFilters_()">&#10006; Clear Filters</button>' +
     '</div>';
 }
 function mtDateBarHtml_(){ return '<div class="mt-datebar" id="mtDateBar">'+mtDateBarInner_()+'</div>'; }
