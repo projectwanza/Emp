@@ -1852,6 +1852,7 @@ function renderLeadEditForm_(L, O, loading){
           inp('elOwner','Owner Name',L.ownerName) + inp('elOwnership','Ownership',L.ownership,'list="dlOwnership"') +
         '</div>' +
         '<div class="field"><label>Remark</label><textarea id="elRemark" rows="2" '+(loading?'disabled placeholder="Loading..."':'')+'>'+esc(L.remark||'')+'</textarea></div>' +
+        leadPhotoBlockHtml_('el', L.photo, loading) +
         inp('elAssign','Assign Executive (read-only)',L.assignExecutive,'readonly style="background:var(--neutral-bg);"') +
         dl('dlPriority',O_.priority) + dl('dlSize',O_.shopSize) + dl('dlOwnership',O_.ownership) +
       '</div>' +
@@ -1861,6 +1862,7 @@ function renderLeadEditForm_(L, O, loading){
 
 function openLeadEditModal_(leadId, from){
   LEAD_EDIT_FROM_ = from || 'list';
+  EL_PHOTO_ = { url:'', uploading:false };   // NEW - blank url = keep the current photo
   const cached = LEAD_DETAIL_CACHE_[leadId];
   if(cached && cached.success){
     renderLeadEditForm_(cached.lead, cached.options || {});   // already have the full record - zero network wait
@@ -1885,6 +1887,7 @@ function openLeadEditModal_(leadId, from){
 function saveLeadEdit_(leadId){
   const v = function(id){ return q('#'+id).value.trim(); };
   if(!v('elName')){ showToast('Lead name is required.', 'err'); return; }
+  if(EL_PHOTO_.uploading){ showToast('Photo is still uploading - please wait a moment.', 'err'); return; }
   const btn = q('#elSaveBtn'); btn.disabled=true; btn.textContent='Saving...';
   google.script.run
     .withSuccessHandler(function(res){
@@ -1899,7 +1902,7 @@ function saveLeadEdit_(leadId){
       name: v('elName'), shopOriginalName: v('elShop'), phoneNo: v('elPhone'), area: v('elArea'),
       address: v('elAddress'), lat: v('elLat'), lng: v('elLng'), priority: v('elPriority'), status: v('elStatus'),
       shopServices: v('elServices'), shopSize: v('elSize'), visitedDay: v('elVisited'),
-      ownerName: v('elOwner'), ownership: v('elOwnership'), remark: v('elRemark')
+      ownerName: v('elOwner'), ownership: v('elOwnership'), remark: v('elRemark'), photoUrl: EL_PHOTO_.url
     });
 }
 
@@ -1956,7 +1959,7 @@ function renderLeadDetail_(res){
   });
   const item = function(k, v, span){ return '<div class="profile-item'+(span?' span2':'')+'"><div class="k">'+k+'</div><div class="v">'+(v ? esc(v) : '—')+'</div></div>'; };
   const lid = esc(L.leadId), nm = esc(L.name);
-  const photoHtml = /^https?:\/\//i.test(L.photo) ? '<a href="'+esc(L.photo)+'" target="_blank" rel="noopener" style="color:var(--primary-accent);">View Photo</a>' : esc(L.photo||'—');
+  const photoHtml = /^https?:\/\//i.test(L.photo) ? '<a href="'+esc(L.photo)+'" target="_blank" rel="noopener" style="color:var(--primary-accent);"><img src="'+esc(leadPhotoThumb_(L.photo))+'" alt="Shop photo" style="display:block;max-width:100%;max-height:160px;border-radius:8px;border:1px solid var(--border);margin-bottom:4px;">View Photo</a>' : esc(L.photo||'—');
   const last = tl[0];
   main.innerHTML =
     leadBackBtn_() +
@@ -2778,6 +2781,7 @@ function saveCustomerNote_(customerId){
 /* ---- Add Customer (auto-assigned to logged-in employee) ---- */
 
 function openAddCustomerModal(){
+  AC_PHOTO_ = { url:'', uploading:false };   // NEW - fresh photo state for every new lead
   q('#modalHost').innerHTML =
     '<div class="modal-overlay" onclick="if(event.target===this) closeModal()"><div class="modal">' +
       '<div class="modal-head"><h3>Add Customer (New Lead)</h3><button class="modal-close" onclick="closeModal()">&times;</button></div>' +
@@ -2790,6 +2794,7 @@ function openAddCustomerModal(){
         '<div class="field"><label>Address (optional)</label><textarea id="acAddress" rows="2"></textarea></div>' +
         '<div class="field"><label>Lat,Long (optional - more accurate than Address for the Location icon)</label><input type="text" id="acLatLong" placeholder="e.g. 22.5726,88.3639"></div>' +
         '<button class="btn btn-ghost" style="width:100%;margin:0 0 12px;" onclick="captureAcLocation_()">📍 Use My Current Location</button>' +
+        leadPhotoBlockHtml_('ac', '', false) +
         '<p style="font-size:12px;color:var(--text-2);margin:0;">This will be saved as a <strong>Lead</strong> assigned to you (<strong>'+esc(EMP_NAME)+'</strong>). It becomes a customer only after it is converted/approved.</p>' +
       '</div>' +
       '<div class="modal-actions"><button class="btn btn-primary" id="acSaveBtn" onclick="saveNewCustomer()">Save</button><button class="btn btn-ghost" onclick="closeModal()">Cancel</button></div>' +
@@ -2843,6 +2848,7 @@ function saveNewCustomer(){
   let latLong = q('#acLatLong').value.trim();
   if(!name){ showToast('Customer name is required.', 'err'); return; }
   if(!mobile){ showToast('Mobile number is required.', 'err'); return; }
+  if(AC_PHOTO_.uploading){ showToast('Photo is still uploading - please wait a moment.', 'err'); return; }
   if(latLong){
     if(!isValidLatLong_(latLong)){ showToast('Lat,Long must look like 22.5726,88.3639 (or leave it blank).', 'err'); return; }
     latLong = latLong.replace(/\s+/g, ''); // save as clean "lat,long"
@@ -2859,7 +2865,65 @@ function saveNewCustomer(){
       } else { showToast((res && res.message) || 'Failed to add lead.', 'err'); }
     })
     .withFailureHandler(function(){ btn.disabled=false; btn.textContent='Save'; showToast('Failed to add lead.', 'err'); })
-    .apiEmployeeCreateLead(ETOKEN, { customerName: name, mobile: mobile, email: email, openingBalance: opening, address: address, latLong: latLong });
+    .apiEmployeeCreateLead(ETOKEN, { customerName: name, mobile: mobile, email: email, openingBalance: opening, address: address, latLong: latLong, photoUrl: AC_PHOTO_.url });
+}
+
+/* ---- NEW: Shop photo (gallery/camera -> compress -> Google Drive -> link saved on the lead) ---- */
+let AC_PHOTO_ = { url:'', uploading:false };
+let EL_PHOTO_ = { url:'', uploading:false };
+function leadPhotoThumb_(url){
+  const m = String(url||'').match(/[?&]id=([\w-]+)/) || String(url||'').match(/\/d\/([\w-]+)/);
+  return m ? ('https://drive.google.com/thumbnail?id='+m[1]+'&sz=w400') : String(url||'');
+}
+// Phone photos are several MB - shrink to max 1280px JPEG (~150-300 KB) before uploading.
+function compressImageFile_(file, cb){
+  const reader = new FileReader();
+  reader.onerror = function(){ cb(null); };
+  reader.onload = function(){
+    const img = new Image();
+    img.onerror = function(){ cb(null); };
+    img.onload = function(){
+      const max = 1280; let w = img.width, h = img.height;
+      if(w > max || h > max){ const r = Math.min(max/w, max/h); w = Math.round(w*r); h = Math.round(h*r); }
+      const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+      cv.getContext('2d').drawImage(img, 0, 0, w, h);
+      const dataUrl = cv.toDataURL('image/jpeg', 0.75);
+      cb({ dataUrl: dataUrl, base64: dataUrl.split(',')[1] });
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+}
+function pickLeadPhoto_(prefix){ const f = q('#'+prefix+'PhotoFile'); if(f) f.click(); }
+function onLeadPhotoPicked_(prefix, input){
+  const file = input.files && input.files[0]; if(!file) return;
+  if(!/^image\//.test(file.type)){ showToast('Please choose an image file.', 'err'); input.value=''; return; }
+  const st = prefix === 'ac' ? AC_PHOTO_ : EL_PHOTO_;
+  const prev = q('#'+prefix+'PhotoPrev'), status = q('#'+prefix+'PhotoStatus');
+  st.url = ''; st.uploading = true;
+  if(status) status.textContent = 'Preparing photo...';
+  compressImageFile_(file, function(res){
+    if(!res){ st.uploading = false; if(status) status.textContent = 'Could not read this image.'; showToast('Could not read this image.', 'err'); return; }
+    if(prev){ prev.src = res.dataUrl; prev.classList.remove('hidden'); }      // instant local preview
+    if(status) status.textContent = 'Uploading...';
+    const nameEl = q(prefix === 'ac' ? '#acName' : '#elName');
+    google.script.run
+      .withSuccessHandler(function(r){
+        st.uploading = false;
+        if(r && r.success){ st.url = r.url; if(status) status.textContent = '✔ Photo ready'; }
+        else { if(status) status.textContent = 'Upload failed'; showToast((r && r.message) || 'Photo upload failed.', 'err'); }
+      })
+      .withFailureHandler(function(err){ st.uploading = false; if(status) status.textContent = 'Upload failed'; onEmployeeSessionError(err); })
+      .apiEmployeeUploadLeadPhoto(ETOKEN, res.base64, 'image/jpeg', nameEl ? nameEl.value : '');
+  });
+}
+function leadPhotoBlockHtml_(prefix, currentUrl, disabled){
+  const cur = /^https?:\/\//i.test(String(currentUrl||'')) ? leadPhotoThumb_(currentUrl) : '';
+  return '<div class="field"><label>Shop Photo (optional)</label>' +
+    '<input type="file" accept="image/*" id="'+prefix+'PhotoFile" class="hidden" onchange="onLeadPhotoPicked_(\''+prefix+'\', this)">' +
+    '<img id="'+prefix+'PhotoPrev" class="'+(cur?'':'hidden')+'" src="'+esc(cur)+'" alt="Shop photo" style="display:block;max-width:100%;max-height:180px;border-radius:10px;border:1px solid var(--border);margin-bottom:8px;object-fit:cover;">' +
+    '<button type="button" class="btn btn-ghost" style="width:100%;" '+(disabled?'disabled':'')+' onclick="pickLeadPhoto_(\''+prefix+'\')">📷 '+(cur?'Change Photo':'Add Photo (gallery / camera)')+'</button>' +
+    '<div id="'+prefix+'PhotoStatus" style="font-size:12px;color:var(--text-2);margin-top:4px;"></div></div>';
 }
 
 /* ---- Add Visit (captures live location + date/time automatically) ---- */
@@ -2877,18 +2941,33 @@ function openAddVisitModal(customerId, customerName){
     '</div></div>';
 }
 
+// Instant: the modal closes and the table updates immediately; the location
+// capture and the sheet save continue in the background (same idea as the
+// status dropdown). If the save fails, the old value comes back + an error toast.
 function saveVisit_(customerId){
   const notes = q('#visitNotes').value.trim();
-  const btn = q('#visitSaveBtn'); btn.disabled=true; btn.textContent='Capturing location...';
+  const c = findCustomerInCache_(customerId);
+  const prev = c ? { lastLogVisitRaw:c.lastLogVisitRaw, lastVisitDateRaw:c.lastVisitDateRaw, lastVisitDate:c.lastVisitDate } : null;
+  const nowMs = Date.now();
+  closeModal();
+  if(c){                                               // optimistic - "Last Visit" updates right now
+    c.lastLogVisitRaw = nowMs;
+    if(nowMs > (Number(c.lastVisitDateRaw)||0)){ c.lastVisitDateRaw = nowMs; c.lastVisitDate = mcFmtDate_(nowMs); }
+    paintMyCustomers_();
+  }
+  showToast('Visit logged.', 'ok');
+  EMP_DASH_LOADED_ = false;                            // dashboard "Today's Activity" refetches when next opened
+  const revert = function(){
+    const cur = findCustomerInCache_(customerId);
+    if(cur && prev){ cur.lastLogVisitRaw = prev.lastLogVisitRaw; cur.lastVisitDateRaw = prev.lastVisitDateRaw; cur.lastVisitDate = prev.lastVisitDate; paintMyCustomers_(); }
+  };
   captureLocation_().then(function(loc){
-    btn.textContent='Saving...';
     google.script.run
       .withSuccessHandler(function(res){
-        btn.disabled=false; btn.textContent='Save Visit';
-        if(res && res.success){ showToast('Visit logged.', 'ok'); closeModal(); refreshMyCustomersSilently_(); }
-        else { showToast((res && res.message) || 'Failed to log visit.', 'err'); }
+        if(res && res.success){ refreshMyCustomersSilently_(); }
+        else { revert(); showToast((res && res.message) || 'Visit could not be saved. Please try again.', 'err'); }
       })
-      .withFailureHandler(function(){ btn.disabled=false; btn.textContent='Save Visit'; showToast('Failed to log visit.', 'err'); })
+      .withFailureHandler(function(err){ revert(); onEmployeeSessionError(err); })
       .apiEmployeeAddVisit(ETOKEN, customerId, loc.lat, loc.lng, notes);
   });
 }
