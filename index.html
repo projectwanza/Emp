@@ -1076,7 +1076,7 @@ function openTaskDetailModal_(taskId){
       body += sec('Task history') +
         tl(th, function(e){ return '<div class="lt-item"><div class="lt-time">'+dash(e.dateTime)+'</div><span class="badge">'+esc(e.event)+'</span><div class="lt-text">'+esc(e.details)+'</div>'+(e.by?'<div class="lt-by">by '+esc(e.by)+'</div>':'')+'</div>'; }, 'No history yet.');
       body += sec('Notes &amp; activity history') +
-        tl(res.activity||[], function(e){ return '<div class="lt-item"><div class="lt-time">'+dash(e.dateTime)+'</div><span class="lt-tag">'+esc(e.label||'Activity')+'</span>'+(e.text?'<div class="lt-text">'+esc(e.text)+'</div>':'')+(e.by?'<div class="lt-by">by '+esc(e.by)+'</div>':'')+'</div>'; }, 'No notes or activity yet.');
+        tl(res.activity||[], function(e){ return '<div class="lt-item"><div class="lt-time">'+dash(e.dateTime)+'</div><span class="lt-tag"'+visitToneAttr_(e)+'>'+esc(e.label||'Activity')+'</span>'+(e.text?'<div class="lt-text">'+esc(e.text)+visitMapLink_(e)+'</div>':'')+(e.detail?'<div class="lt-text" style="color:var(--text-2);font-size:12.5px;">'+esc(e.detail)+'</div>':'')+(e.by?'<div class="lt-by">by '+esc(e.by)+'</div>':'')+'</div>'; }, 'No notes or activity yet.');
     }
     q('#modalHost').innerHTML =
       '<div class="modal-overlay" onclick="if(event.target===this) closeModal()"><div class="modal" style="max-width:640px;">' +
@@ -1224,7 +1224,7 @@ function captureLocation_(){
   return new Promise(function(resolve){
     if(!navigator.geolocation){ resolve({lat:'',lng:''}); return; }
     navigator.geolocation.getCurrentPosition(
-      function(pos){ resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }); },
+      function(pos){ resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude, acc: pos.coords.accuracy }); },
       function(){ resolve({lat:'',lng:''}); },
       { enableHighAccuracy:true, timeout:8000, maximumAge:0 }
     );
@@ -2739,8 +2739,10 @@ function openCustomerProfile(customerId){
           ((res.activity||[]).length
             ? '<div class="lead-timeline">'+(res.activity||[]).map(function(a){
                 return '<div class="lt-item"><div class="lt-time">'+esc(a.dateTime||'—')+'</div>' +
-                  '<span class="badge">'+esc(a.label)+'</span>' +
-                  '<div class="lt-text">'+esc(a.text)+'</div>'+(a.by?'<div class="lt-by">by '+esc(a.by)+'</div>':'')+'</div>';
+                  '<span class="badge"'+visitToneAttr_(a)+'>'+esc(a.label)+'</span>' +
+                  '<div class="lt-text">'+esc(a.text)+visitMapLink_(a)+'</div>' +
+                  (a.detail ? '<div class="lt-text" style="color:var(--text-2);font-size:12.5px;">'+esc(a.detail)+'</div>' : '') +
+                  (a.by?'<div class="lt-by">by '+esc(a.by)+'</div>':'')+'</div>';
               }).join('')+'</div>'
             : '<div class="empty-state">No activity yet. Tap “+ Add Note” to log the first one.</div>') +
         '</div></div>';
@@ -2964,12 +2966,26 @@ function saveVisit_(customerId){
   captureLocation_().then(function(loc){
     google.script.run
       .withSuccessHandler(function(res){
-        if(res && res.success){ refreshMyCustomersSilently_(); }
+        if(res && res.success){
+          refreshMyCustomersSilently_();
+          if(res.verification === 'INSIDE') showToast('Verified: INSIDE shop ('+res.distance+' m)', 'ok');
+          else if(res.verification === 'OUTSIDE') showToast('Visit is OUTSIDE the shop radius ('+res.distance+' m from shop)', 'err');
+          else showToast('Location unavailable - visit saved without verification.');
+        }
         else { revert(); showToast((res && res.message) || 'Visit could not be saved. Please try again.', 'err'); }
       })
       .withFailureHandler(function(err){ revert(); onEmployeeSessionError(err); })
-      .apiEmployeeAddVisit(ETOKEN, customerId, loc.lat, loc.lng, notes);
+      .apiEmployeeAddVisit(ETOKEN, customerId, loc.lat, loc.lng, notes, loc.acc);
   });
+}
+
+/* ---- NEW: Log Visit verification display (INSIDE / OUTSIDE / LOCATION UNAVAILABLE + See Location) ---- */
+function visitToneAttr_(a){
+  const m = { INSIDE:'background:#e7f6ec;color:#1d6f42;', OUTSIDE:'background:#fdecea;color:#b42318;', UNAVAILABLE:'background:#fdf2d8;color:#8a5a00;' };
+  return (a && a.kind === 'VISIT' && m[a.tone]) ? ' style="'+m[a.tone]+'"' : '';
+}
+function visitMapLink_(a){
+  return (a && a.mapUrl) ? ' <a href="'+esc(a.mapUrl)+'" target="_blank" rel="noopener" style="color:var(--primary-accent);font-weight:700;white-space:nowrap;">[See Location]</a>' : '';
 }
 
 /* ================= CALL / LOCATION (Action column icons) ================= */
