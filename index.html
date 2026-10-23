@@ -2758,9 +2758,7 @@ function openCustomerProfile(customerId){
 }
 
 /* ---- NEW: collapsible Log Visit entry in the customer Notes & Activity timeline ---- */
-function actIsVisit_(a){
-  return /Log Visit/i.test(String(a.label||'')) || /Distance from shop/i.test(String(a.text||''));
-}
+
 // Splits the entry text into "detail" (distance / location link) and "notes".
 function actSplit_(a){
   const raw = String(a.text||'');
@@ -2776,17 +2774,27 @@ function actLinkify_(s){
     return '<a href="'+u+'" target="_blank" rel="noopener">['+t+']</a>';
   });
 }
+function actIsVisit_(a){
+  return !!a && (a.kind === 'VISIT' || /Log Visit/i.test(String(a.label||'')));
+}
+// Visit entry has collapsible part only if it has Distance text or a map link.
+function actHasDet_(a){
+  return actIsVisit_(a) && !!(String(a.text||'').trim() || a.mapUrl);
+}
 function actHeadHtml_(a){
-  if(!actIsVisit_(a)) return '<span class="badge">'+esc(a.label)+'</span>';
-  const sp = actSplit_(a);
-  if(!sp.det) return '<span class="badge">'+esc(a.label)+'</span>';
-  return '<span class="badge act-tg" onclick="toggleActDetail_(this)">'+esc(a.label)+' <span class="act-arrow">&#9660;</span></span>';
+  if(!actHasDet_(a)) return '<span class="badge"'+visitToneAttr_(a)+'>'+esc(a.label)+'</span>';
+  return '<span class="badge act-tg"'+visitToneAttr_(a)+' onclick="toggleActDetail_(this)">'+esc(a.label)+' <span class="act-arrow">&#9660;</span></span>';
 }
 function actBodyHtml_(a){
-  if(!actIsVisit_(a)) return '<div class="lt-text">'+esc(a.text)+'</div>';
-  const sp = actSplit_(a);
-  return (sp.det ? '<div class="act-det">'+actLinkify_(sp.det)+'</div>' : '') +
-         (sp.notes ? '<div class="lt-text act-notes">Notes: <b>'+esc(sp.notes)+'</b></div>' : '');
+  if(!actHasDet_(a)){
+    // every non-visit entry: EXACTLY the old rendering
+    return '<div class="lt-text">'+esc(a.text)+visitMapLink_(a)+'</div>' +
+      (a.detail ? '<div class="lt-text" style="color:var(--text-2);font-size:12.5px;">'+esc(a.detail)+'</div>' : '');
+  }
+  // Visit: Distance + [See Location] hidden until header is clicked; Notes always visible (bold)
+  const notes = String(a.detail||'').replace(/^\s*Notes:\s*/i,'').trim();
+  return '<div class="act-det">'+esc(a.text)+visitMapLink_(a)+'</div>' +
+    (notes ? '<div class="lt-text act-notes">Notes: <b>'+esc(notes)+'</b></div>' : '');
 }
 function toggleActDetail_(el){
   const item = el.closest('.lt-item');
