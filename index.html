@@ -298,6 +298,13 @@
       .sv-controls{top:8px;right:8px;gap:6px;}
       .sv-ctrl-btn{padding:7px 9px;font-size:11.5px;}
     }
+    /* NEW: collapsible "Log Visit" entries in Notes & Activity History */
+    .act-tg{cursor:pointer;user-select:none;}
+    .act-arrow{font-size:10px;margin-left:4px;}
+    .act-det{display:none;font-size:13px;margin:3px 0 2px;white-space:pre-wrap;word-break:break-word;}
+    .lt-item.act-open .act-det{display:block;}
+    .act-det a{color:var(--primary-accent);font-weight:600;}
+    .act-notes{margin-top:2px;}
   </style>
 </head>
 <body>
@@ -2739,9 +2746,8 @@ function openCustomerProfile(customerId){
           ((res.activity||[]).length
             ? '<div class="lead-timeline">'+(res.activity||[]).map(function(a){
                 return '<div class="lt-item"><div class="lt-time">'+esc(a.dateTime||'—')+'</div>' +
-                  '<span class="badge"'+visitToneAttr_(a)+'>'+esc(a.label)+'</span>' +
-                  '<div class="lt-text">'+esc(a.text)+visitMapLink_(a)+'</div>' +
-                  (a.detail ? '<div class="lt-text" style="color:var(--text-2);font-size:12.5px;">'+esc(a.detail)+'</div>' : '') +
+                  actHeadHtml_(a) +
+                  actBodyHtml_(a) +
                   (a.by?'<div class="lt-by">by '+esc(a.by)+'</div>':'')+'</div>';
               }).join('')+'</div>'
             : '<div class="empty-state">No activity yet. Tap “+ Add Note” to log the first one.</div>') +
@@ -2749,6 +2755,45 @@ function openCustomerProfile(customerId){
     })
     .withFailureHandler(onEmployeeSessionError)
     .apiEmployeeGetCustomerProfile(ETOKEN, customerId);
+}
+
+/* ---- NEW: collapsible Log Visit entry in the customer Notes & Activity timeline ---- */
+function actIsVisit_(a){
+  return /Log Visit/i.test(String(a.label||'')) || /Distance from shop/i.test(String(a.text||''));
+}
+// Splits the entry text into "detail" (distance / location link) and "notes".
+function actSplit_(a){
+  const raw = String(a.text||'');
+  const m = raw.match(/Notes:\s*([\s\S]*)$/i);
+  let det = m ? raw.slice(0, m.index) : raw;
+  let notes = m ? m[1] : '';
+  const lm = notes.match(/\s*\|\s*(Location:[\s\S]*)$/i);   // older "Notes: x | Location: ..." format
+  if(lm){ det += '\n' + lm[1]; notes = notes.slice(0, lm.index); }
+  return { det: det.trim(), notes: notes.trim() };
+}
+function actLinkify_(s){
+  return esc(s).replace(/\[{1,2}([^\[\]]*)\]{1,2}\((https?:\/\/[^\s)]+)\)/g, function(m, t, u){
+    return '<a href="'+u+'" target="_blank" rel="noopener">['+t+']</a>';
+  });
+}
+function actHeadHtml_(a){
+  if(!actIsVisit_(a)) return '<span class="badge">'+esc(a.label)+'</span>';
+  const sp = actSplit_(a);
+  if(!sp.det) return '<span class="badge">'+esc(a.label)+'</span>';
+  return '<span class="badge act-tg" onclick="toggleActDetail_(this)">'+esc(a.label)+' <span class="act-arrow">&#9660;</span></span>';
+}
+function actBodyHtml_(a){
+  if(!actIsVisit_(a)) return '<div class="lt-text">'+esc(a.text)+'</div>';
+  const sp = actSplit_(a);
+  return (sp.det ? '<div class="act-det">'+actLinkify_(sp.det)+'</div>' : '') +
+         (sp.notes ? '<div class="lt-text act-notes">Notes: <b>'+esc(sp.notes)+'</b></div>' : '');
+}
+function toggleActDetail_(el){
+  const item = el.closest('.lt-item');
+  if(!item) return;
+  const open = item.classList.toggle('act-open');
+  const ar = el.querySelector('.act-arrow');
+  if(ar) ar.innerHTML = open ? '&#9650;' : '&#9660;';
 }
 
 /* ---- Add Note for a Customer (historical - same pattern as Lead notes) ---- */
