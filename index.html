@@ -380,8 +380,26 @@
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 
 <script>
-let ETOKEN = sessionStorage.getItem('employee_token') || null;
-let EMP_NAME = sessionStorage.getItem('employee_name') || '';
+// NEW: persistent login - localStorage survives closing the browser / removing
+// from Recent Apps / phone restart (sessionStorage did not). Falls back to
+// sessionStorage if localStorage is blocked. Old sessionStorage logins migrate automatically.
+const EMP_KEYS_ = ['employee_token', 'employee_name'];
+function empStoreGet_(k){
+  try { const v = localStorage.getItem(k); if(v !== null) return v; } catch(e){}
+  try { return sessionStorage.getItem(k); } catch(e){ return null; }
+}
+function empStoreSet_(k, v){
+  try { localStorage.setItem(k, v); } catch(e){}
+  try { sessionStorage.setItem(k, v); } catch(e){}
+}
+function empStoreClear_(){
+  EMP_KEYS_.forEach(function(k){
+    try { localStorage.removeItem(k); } catch(e){}
+    try { sessionStorage.removeItem(k); } catch(e){}
+  });
+}
+let ETOKEN = empStoreGet_('employee_token') || null;
+let EMP_NAME = empStoreGet_('employee_name') || '';
 let MY_CUSTOMERS_CACHE = [];
 let MC_LOADED_ = false; // NEW - true after the first successful My Customers fetch
 let MC_ADV_ = { active:false, days:15, types:[], status:'has', statuses:[], tags:[] }; // NEW - applied Advanced Filter (statuses, tags: NEW)
@@ -427,8 +445,8 @@ function employeeLogin(){
       btn.disabled=false; btn.textContent='Sign In';
       if(res && res.success){
         ETOKEN = res.token; EMP_NAME = res.employeeName;
-        sessionStorage.setItem('employee_token', res.token);
-        sessionStorage.setItem('employee_name', res.employeeName);
+        empStoreSet_('employee_token', res.token);
+        empStoreSet_('employee_name', res.employeeName);
         enterEmployee();
       } else { errBox.textContent = (res && res.message) || 'Login failed.'; errBox.classList.remove('hidden'); }
     })
@@ -438,7 +456,7 @@ function employeeLogin(){
 
 function employeeLogout(){
   google.script.run.apiEmployeeLogout(ETOKEN);
-  sessionStorage.clear(); ETOKEN = null; EMP_NAME = '';
+  empStoreClear_(); ETOKEN = null; EMP_NAME = '';
   MY_CUSTOMERS_CACHE = []; MC_LOADED_ = false; // NEW - next login fetches fresh once
   MC_LAST_LIST_ = []; MC_SHARE_MSGS_ = [];
   MY_TASKS_CACHE = []; MT_LOADED_ = false; // NEW
@@ -470,11 +488,17 @@ function onEmployeeSessionError(err){
 }
 
 window.addEventListener('load', function(){
+  // NEW: ask the browser not to evict our saved login under storage pressure
+  try { if(navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch(e){}
   if(ETOKEN){
     google.script.run.withSuccessHandler(function(res){
-      if(res && res.valid){ EMP_NAME = res.employeeName; sessionStorage.setItem('employee_name', EMP_NAME); enterEmployee(); }
-      else { sessionStorage.clear(); }
-    }).withFailureHandler(function(){ sessionStorage.clear(); }).apiEmployeeCheckSession(ETOKEN);
+      if(res && res.valid){ EMP_NAME = res.employeeName; empStoreSet_('employee_name', EMP_NAME); enterEmployee(); }
+      else { empStoreClear_(); ETOKEN = null; }
+    }).withFailureHandler(function(err){
+      const msg = (err && err.message) ? err.message : String(err || '');
+      if(msg.indexOf('EMPLOYEE_SESSION_EXPIRED') !== -1){ empStoreClear_(); ETOKEN = null; }
+      else if(EMP_NAME){ enterEmployee(); } // NEW: slow net / cold start must NOT log the employee out
+    }).apiEmployeeCheckSession(ETOKEN);
   }
   q('#empPass').addEventListener('keydown', function(e){ if(e.key==='Enter') employeeLogin(); });
 });
