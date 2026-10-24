@@ -1830,20 +1830,52 @@ function openLeadNoteModal_(leadId, leadName, from){
       '<div class="modal-actions"><button class="btn btn-primary" id="lnSaveBtn" onclick="saveLeadNote_(\''+esc(leadId)+'\')">Save Note</button><button class="btn btn-ghost" onclick="closeModal()">Cancel</button></div>' +
     '</div></div>';
 }
+// Instant (same idea as Log Visit): modal closes, list / history update right now; the location
+// capture and the sheet save continue in the background. If the save fails, the old state comes back + error toast.
 function saveLeadNote_(leadId){
   const text = q('#lnText').value.trim();
   if(!text){ showToast('Please write a note.', 'err'); return; }
-  const btn = q('#lnSaveBtn'); btn.disabled=true; btn.textContent='Saving...';
-  google.script.run
-    .withSuccessHandler(function(res){
-      btn.disabled=false; btn.textContent='Save Note';
-      if(res && res.success){
-        showToast('Note added.', 'ok'); closeModal();
-        delete LEAD_DETAIL_CACHE_[leadId]; if(LEAD_NOTE_FROM_ === 'detail') openLeadDetail_(leadId, true); else refreshMyLeadsSilently_();
-      } else { showToast((res && res.message) || 'Failed to add note.', 'err'); }
-    })
-    .withFailureHandler(function(){ btn.disabled=false; btn.textContent='Save Note'; showToast('Failed to add note.', 'err'); })
-    .apiEmployeeAddLeadNote(ETOKEN, leadId, text);
+  const from = LEAD_NOTE_FROM_;
+  const nowMs = Date.now();
+  const nowTxt = new Date(nowMs).toLocaleString('en-GB', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit', hour12:true });
+  const l = findLeadInCache_(leadId);
+  const prevLast = l ? { d:l.lastActivityDate, n:l.lastNote } : null;
+  const cur = LEAD_DETAIL_CACHE_[leadId];
+  const prevTl = cur ? cur.timeline : null, prevNotes = cur ? cur.notes : null;
+  closeModal();
+
+  const repaintDetail = function(c){
+    if(LEAD_DETAIL_OPEN_ === leadId && q('#leadBackBtn')){ const y = window.pageYOffset || 0; renderLeadDetail_(c); window.scrollTo(0, y); }
+  };
+  if(l){ l.lastActivityDate = nowTxt; l.lastNote = text; if(from === 'list') paintMyLeads_(); }   // optimistic - list updates right now
+  if(cur && cur.success){                                                                          // optimistic - history updates right now
+    cur.timeline = [{ kind:'NOTE_ADDED', label:'Note Added', text:text, by:EMP_NAME, dateTime:nowTxt, t:nowMs }].concat(cur.timeline || []);
+    cur.notes = [{ noteId:'', note:text, by:EMP_NAME, dateTime:nowTxt, t:nowMs }].concat(cur.notes || []);
+    repaintDetail(cur);
+  }
+  showToast('Note added.', 'ok');
+  EMP_DASH_LOADED_ = false;
+
+  const revert = function(){
+    if(l && prevLast){ l.lastActivityDate = prevLast.d; l.lastNote = prevLast.n; if(from === 'list') paintMyLeads_(); }
+    const c2 = LEAD_DETAIL_CACHE_[leadId];
+    if(c2 && prevTl !== null){ c2.timeline = prevTl; c2.notes = prevNotes; repaintDetail(c2); }
+  };
+  captureLocation_().then(function(loc){
+    google.script.run
+      .withSuccessHandler(function(res){
+        if(res && res.success){
+          refreshMyLeadsSilently_();
+          if(LEAD_DETAIL_OPEN_ === leadId && q('#leadBackBtn')) refreshLeadDetailSilently_(leadId);
+          else delete LEAD_DETAIL_CACHE_[leadId];
+          if(res.verification === 'INSIDE') showToast('Verified: INSIDE lead location ('+res.distance+' m)', 'ok');
+          else if(res.verification === 'OUTSIDE') showToast('Note saved from OUTSIDE the lead location ('+res.distance+' m away)', 'err');
+          else if(res.verification) showToast('Location unavailable - note saved without verification.');
+        } else { revert(); showToast((res && res.message) || 'Note could not be saved. Please try again.', 'err'); }
+      })
+      .withFailureHandler(function(err){ revert(); onEmployeeSessionError(err); })
+      .apiEmployeeAddLeadNote(ETOKEN, leadId, text, loc.lat, loc.lng, loc.acc);
+  });
 }
 
 /* ---- Edit Lead (full lead edit - updates the SAME row, Lead ID read-only) ---- */
@@ -2027,9 +2059,8 @@ function renderLeadDetail_(res){
       (tl.length
         ? '<div class="lead-timeline">'+tl.map(function(x){
             return '<div class="lt-item '+leadTlClass_(x.kind)+'"><div class="lt-time">'+esc(x.dateTime||'—')+'</div>' +
-              '<span class="lt-tag"'+visitToneAttr_(x)+'>'+esc(x.label||'Activity')+'</span>' +
-              (x.text ? '<div class="lt-text">'+esc(x.text)+visitMapLink_(x)+'</div>' : '') +
-              (x.detail ? '<div class="lt-text" style="color:var(--text-2);font-size:12.5px;">'+esc(x.detail)+'</div>' : '') +
+              actHeadHtml_({ kind:x.kind, label:(x.label||'Activity'), text:x.text, detail:x.detail, tone:x.tone, mapUrl:x.mapUrl }, 'lt-tag') +
+              actBodyHtml_(x) +
               (x.by ? '<div class="lt-by">by '+esc(x.by)+'</div>' : '') + '</div>';
           }).join('')+'</div>'
         : '<div class="empty-state">No activity yet. Tap “+ Add Note” to log the first activity.</div>') +
@@ -2805,15 +2836,16 @@ function actLinkify_(s){
   });
 }
 function actIsVisit_(a){
-  return !!a && (a.kind === 'VISIT' || a.kind === 'WHATSAPP' || /Log Visit/i.test(String(a.label||'')));
+  return !!a && (a.kind === 'VISIT' || a.kind === 'WHATSAPP' || (a.kind === 'NOTE_ADDED' && !!a.tone) || /Log Visit/i.test(String(a.label||'')));
 }
 // Visit entry has collapsible part only if it has Distance text or a map link.
 function actHasDet_(a){
   return actIsVisit_(a) && !!(String(a.text||'').trim() || a.mapUrl);
 }
-function actHeadHtml_(a){
-  if(!actHasDet_(a)) return '<span class="badge"'+visitToneAttr_(a)+'>'+esc(a.label)+'</span>';
-  return '<span class="badge act-tg"'+visitToneAttr_(a)+' onclick="toggleActDetail_(this)">'+esc(a.label)+' <span class="act-arrow">&#9660;</span></span>';
+function actHeadHtml_(a, cls){
+  cls = cls || 'badge';      // NEW: Lead timeline passes 'lt-tag'; Customer timeline unchanged ('badge')
+  if(!actHasDet_(a)) return '<span class="'+cls+'"'+visitToneAttr_(a)+'>'+esc(a.label)+'</span>';
+  return '<span class="'+cls+' act-tg"'+visitToneAttr_(a)+' onclick="toggleActDetail_(this)">'+esc(a.label)+' <span class="act-arrow">&#9660;</span></span>';
 }
 function actBodyHtml_(a){
   if(!actHasDet_(a)){
@@ -3130,7 +3162,7 @@ document.addEventListener('scroll', function(e){ const m = q('#waMenu'); if(m &&
 /* ---- NEW: Log Visit verification display (INSIDE / OUTSIDE / LOCATION UNAVAILABLE + See Location) ---- */
 function visitToneAttr_(a){
   const m = { INSIDE:'background:#e7f6ec;color:#1d6f42;', OUTSIDE:'background:#fdecea;color:#b42318;', UNAVAILABLE:'background:#fdf2d8;color:#8a5a00;' };
-  return (a && (a.kind === 'VISIT' || a.kind === 'WHATSAPP') && m[a.tone]) ? ' style="'+m[a.tone]+'"' : '';
+  return (a && (a.kind === 'VISIT' || a.kind === 'WHATSAPP' || a.kind === 'NOTE_ADDED') && m[a.tone]) ? ' style="'+m[a.tone]+'"' : '';
 }
 function visitMapLink_(a){
   return (a && a.mapUrl) ? ' <a href="'+esc(a.mapUrl)+'" target="_blank" rel="noopener" style="color:var(--primary-accent);font-weight:700;white-space:nowrap;">[See Location]</a>' : '';
