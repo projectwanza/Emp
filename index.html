@@ -1188,9 +1188,9 @@ function pickTaskWhatsAppMessage_(i){
 }
 
 /* ---- Set Due Date / Payment Terms (My Customers) ---- */
-function openPaymentTermsModal_(cid, name){
+function openPaymentTermsModal_(cid, name, curDays){
   const c = findCustomerInCache_(cid) || {};
-  const cur = Number(c.paymentTermsDays) || 0;
+  const cur = (curDays !== undefined && curDays !== null) ? (Number(curDays) || 0) : (Number(c.paymentTermsDays) || 0);
   q('#modalHost').innerHTML =
     '<div class="modal-overlay" onclick="if(event.target===this) closeModal()"><div class="modal">' +
       '<div class="modal-head"><h3>Set Due Date / Payment Terms</h3><button class="modal-close" onclick="closeModal()">&times;</button></div>' +
@@ -1216,6 +1216,7 @@ function savePaymentTerms_(cid){
       if(res && res.success){
         const c = findCustomerInCache_(cid); if(c) c.paymentTermsDays = res.days;
         showToast(res.days ? ('Payment terms set: '+res.days+' days.') : 'Payment terms cleared.', 'ok'); closeModal();
+        if(q('#mainContent') && q('#mainContent').innerHTML.indexOf('Complete Transaction History') > -1) openCustomerProfile(cid);   // NEW - profile shows the new value
       } else showToast((res && res.message) || 'Could not save.', 'err');
     })
     .withFailureHandler(function(){ btn.disabled = false; btn.textContent = 'Save'; showToast('Could not save.', 'err'); })
@@ -1350,7 +1351,8 @@ function paintMyLeads_(){
           '<button class="icon-btn" title="Call" onclick="callLead_(\''+esc(l.phoneNo||'')+'\',\''+lid+'\')">📞</button> ' +
           '<button class="icon-btn" title="Edit Lead" onclick="openLeadEditModal_(\''+lid+'\')">✏️</button> ' +
           '<button class="icon-btn add-visit" title="Add Note" onclick="openLeadNoteModal_(\''+lid+'\',\''+esc(l.name||'')+'\')">+</button> ' +
-          leadLocationBtn_(l) +
+          leadLocationBtn_(l) + ' ' +
+          '<button class="icon-btn" title="WhatsApp" onclick="event.stopPropagation();openWaMenu_(this,\'lead\',\''+lid+'\')">💬</button>' +
         '</td>' +
         '<td>'+esc(l.area||'—')+'</td>' +
         '<td>'+esc(l.lastActivityDate||'—')+'</td>' +
@@ -1374,7 +1376,8 @@ function paintMyLeads_(){
           '<button class="icon-btn" title="Call" onclick="callLead_(\''+esc(l.phoneNo||'')+'\',\''+lid+'\')">📞</button> ' +
           '<button class="icon-btn" title="Edit Lead" onclick="openLeadEditModal_(\''+lid+'\')">✏️</button> ' +
           '<button class="icon-btn add-visit" title="Add Note" onclick="openLeadNoteModal_(\''+lid+'\',\''+esc(l.name||'')+'\')">+</button> ' +
-          leadLocationBtn_(l) +
+          leadLocationBtn_(l) + ' ' +
+          '<button class="icon-btn" title="WhatsApp" onclick="event.stopPropagation();openWaMenu_(this,\'lead\',\''+lid+'\')">💬</button>' +
         '</div>' +
       '</div>';
     }).join('') + '</div>';
@@ -1946,7 +1949,7 @@ function backToMyLeads_(){
 
 function leadTlClass_(kind){
   switch(kind){
-    case 'CALL_CLICKED': return 't-call';
+    case 'CALL_CLICKED': case 'WHATSAPP': return 't-call';
     case 'STATUS_CHANGED': return 't-status';
     case 'LEAD_CONVERTED': case 'CUSTOMER_CONVERTED': return 't-convert';
     case 'TAG_REMOVED': return 't-remove';
@@ -2000,8 +2003,9 @@ function renderLeadDetail_(res){
       (tl.length
         ? '<div class="lead-timeline">'+tl.map(function(x){
             return '<div class="lt-item '+leadTlClass_(x.kind)+'"><div class="lt-time">'+esc(x.dateTime||'—')+'</div>' +
-              '<span class="lt-tag">'+esc(x.label||'Activity')+'</span>' +
-              (x.text ? '<div class="lt-text">'+esc(x.text)+'</div>' : '') +
+              '<span class="lt-tag"'+visitToneAttr_(x)+'>'+esc(x.label||'Activity')+'</span>' +
+              (x.text ? '<div class="lt-text">'+esc(x.text)+visitMapLink_(x)+'</div>' : '') +
+              (x.detail ? '<div class="lt-text" style="color:var(--text-2);font-size:12.5px;">'+esc(x.detail)+'</div>' : '') +
               (x.by ? '<div class="lt-by">by '+esc(x.by)+'</div>' : '') + '</div>';
           }).join('')+'</div>'
         : '<div class="empty-state">No activity yet. Tap “+ Add Note” to log the first activity.</div>') +
@@ -2596,7 +2600,7 @@ function paintMyCustomers_(){
       locationBtn + ' ' +
       '<button class="icon-btn add-visit" title="Add Visit" onclick="event.stopPropagation();openAddVisitModal(\''+cid+'\',\''+esc(c.customerName)+'\')">+</button> ' +
       '<button class="icon-btn" title="Create Order" onclick="event.stopPropagation();openCreateOrderModal_(\''+cid+'\',\''+esc(c.customerName)+'\',\''+esc(c.address||'')+'\',\''+esc(c.latLong||'')+'\',\''+esc(c.mobile||'')+'\')">📦+</button> ' +
-      '<button class="icon-btn" title="Set Due Date / Payment Terms" onclick="event.stopPropagation();openPaymentTermsModal_(\''+cid+'\',\''+esc(c.customerName)+'\')">🗓️</button>';
+      '<button class="icon-btn" title="WhatsApp" onclick="event.stopPropagation();openWaMenu_(this,\'customer\',\''+cid+'\')">💬</button>';
   };
   // Desktop table (unchanged) - hidden on mobile via CSS.
   const tableHtml = '<table><thead><tr><th>Customer</th><th style="width:104px">Action</th>' +
@@ -2706,6 +2710,7 @@ function openCustomerProfile(customerId){
           '<div style="display:flex;gap:8px;">' +
             '<button class="icon-btn" title="Call" onclick="callCustomer_(\''+esc(p.mobile||'')+'\',\''+esc(p.customerId)+'\')">📞</button>' +
             '<button class="icon-btn add-visit" title="Add Note" onclick="openCustomerNoteModal_(\''+esc(p.customerId)+'\',\''+esc(p.customerName)+'\')">+</button>' +
+            '<button class="btn btn-ghost" onclick="openPaymentTermsModal_(\''+esc(p.customerId)+'\',\''+esc(p.customerName)+'\','+(Number(p.paymentTermsDays)||0)+')">🗓️ Payment Terms</button>' +
             '<button class="btn btn-ghost" onclick="openCustomerContactModal_(\''+esc(p.customerId)+'\',\''+esc(p.customerName)+'\',\''+esc(p.mobile||'')+'\',\''+esc(p.address||'')+'\',\''+esc(p.latLong||'')+'\')">✏ Edit Contact & Location</button>' +
           '</div>' +
         '</div>' +
@@ -2717,6 +2722,7 @@ function openCustomerProfile(customerId){
           '<div class="profile-item"><div class="k">Current Balance / Outstanding</div><div class="v" style="font-weight:700;color:'+(p.outstanding>0?'#c0392b':'#101828')+'">'+money(p.outstanding)+'</div></div>' +
           '<div class="profile-item"><div class="k">Address</div><div class="v">'+esc(p.address||'—')+'</div></div>' +
           '<div class="profile-item"><div class="k">Area</div><div class="v">'+esc(p.area||'—')+'</div></div>' +
+          '<div class="profile-item"><div class="k">Payment Terms (Due Date)</div><div class="v">'+(p.paymentTermsDays ? esc(p.paymentTermsDays)+' days after invoice date' : 'Not set')+'</div></div>' +
         '</div>' +
         (function(){
           const ch = res.convertedHistory || [];
@@ -2775,7 +2781,7 @@ function actLinkify_(s){
   });
 }
 function actIsVisit_(a){
-  return !!a && (a.kind === 'VISIT' || /Log Visit/i.test(String(a.label||'')));
+  return !!a && (a.kind === 'VISIT' || a.kind === 'WHATSAPP' || /Log Visit/i.test(String(a.label||'')));
 }
 // Visit entry has collapsible part only if it has Distance text or a map link.
 function actHasDet_(a){
@@ -2792,9 +2798,9 @@ function actBodyHtml_(a){
       (a.detail ? '<div class="lt-text" style="color:var(--text-2);font-size:12.5px;">'+esc(a.detail)+'</div>' : '');
   }
   // Visit: Distance + [See Location] hidden until header is clicked; Notes always visible (bold)
-  const notes = String(a.detail||'').replace(/^\s*Notes:\s*/i,'').trim();
+  const notes = String(a.detail||'').replace(/^\s*(Notes|Message):\s*/i,'').trim();
   return '<div class="act-det">'+esc(a.text)+visitMapLink_(a)+'</div>' +
-    (notes ? '<div class="lt-text act-notes">Notes: <b>'+esc(notes)+'</b></div>' : '');
+    (notes ? '<div class="lt-text act-notes">'+(a.kind === 'WHATSAPP' ? 'Message' : 'Notes')+': <b>'+esc(notes)+'</b></div>' : '');
 }
 function toggleActDetail_(el){
   const item = el.closest('.lt-item');
@@ -3032,10 +3038,75 @@ function saveVisit_(customerId){
   });
 }
 
+/* ---- NEW: WhatsApp message dropdown (Customers + Leads) ---- */
+const WA_MESSAGES_ = {
+  VISIT: { label: '🙏 Visit Message', text: [
+    '🙏 Dear Sir,', '',
+    'Recently, we visited your shop. If you need any products or have any enquiries, please feel free to contact us. 😊', '',
+    '🛒 Order / Product Enquiry:',
+    '📞 6291019367 | 7449603147', '',
+    '🤝 Stay Connected • Stay Updated • Grow Together'
+  ].join('\n') },
+  JOIN: { label: '📢 Join Message', text: [
+    '📢 JOIN OUR WHATSAPP COMMUNITY', '',
+    '📦 Latest Products | New Arrivals | Exclusive Offers & Updates', '',
+    '👉 A&R Official Community',
+    'https://chat.whatsapp.com/JPCT78GTBYCIxhECfgF1J8', '',
+    '👉 Mobile Accessories Community',
+    'https://chat.whatsapp.com/KgqTOGfS5SRE6dKMvEthLD', '',
+    '🛒 Order / Product Enquiry:',
+    '📞 6291019367 | 7449603147', '',
+    'Stay Connected • Stay Updated • Grow Together'
+  ].join('\n') }
+};
+let WA_MENU_CTX_ = null;
+function closeWaMenu_(){ const m = q('#waMenu'); if(m) m.remove(); WA_MENU_CTX_ = null; }
+function openWaMenu_(el, type, id){
+  const same = WA_MENU_CTX_ && WA_MENU_CTX_.type === type && WA_MENU_CTX_.id === id;
+  closeWaMenu_();
+  if(same) return;                                   // tapping the same button again just closes the menu
+  WA_MENU_CTX_ = { type: type, id: id };
+  const m = document.createElement('div');
+  m.id = 'waMenu'; m.className = 'lead-status-menu';
+  m.innerHTML = Object.keys(WA_MESSAGES_).map(function(k){
+    return '<button type="button" onclick="pickWaMessage_(\''+k+'\')">'+esc(WA_MESSAGES_[k].label)+'</button>';
+  }).join('');
+  document.body.appendChild(m);
+  const r = el.getBoundingClientRect();
+  const mh = m.offsetHeight, mw = m.offsetWidth;
+  let top = r.bottom + 4;
+  if(top + mh > window.innerHeight - 8) top = Math.max(8, r.top - mh - 4);
+  const left = Math.max(8, Math.min(r.left, window.innerWidth - mw - 8));
+  m.style.top = top + 'px'; m.style.left = left + 'px';
+}
+function pickWaMessage_(key){
+  const ctx = WA_MENU_CTX_;
+  closeWaMenu_();
+  const msg = WA_MESSAGES_[key];
+  if(!ctx || !msg) return;
+  const ent = ctx.type === 'lead' ? findLeadInCache_(ctx.id) : findCustomerInCache_(ctx.id);
+  const phone = ent ? (ctx.type === 'lead' ? ent.phoneNo : ent.mobile) : '';
+  const digits = String(phone||'').replace(/\D/g,'');
+  if(digits.length < 10){ showToast('Phone number not available.', 'err'); return; }
+  const num = (digits.length >= 12 && digits.indexOf('91') === 0) ? digits : ('91' + digits.slice(-10));
+  const locP = captureLocation_();                   // GPS starts right now, in the same click
+  window.open('https://wa.me/' + num + '?text=' + encodeURIComponent(msg.text), '_blank');   // opens instantly - you check the message and press Send yourself
+  locP.then(function(loc){                           // the record is saved in the background, with the location
+    google.script.run
+      .withSuccessHandler(function(){})
+      .withFailureHandler(function(err){ onEmployeeSessionError(err); })
+      .apiEmployeeLogWhatsApp(ETOKEN, ctx.type, ctx.id, key, loc.lat, loc.lng, loc.acc);
+  });
+}
+document.addEventListener('click', function(e){ const m = q('#waMenu'); if(m && !m.contains(e.target)) closeWaMenu_(); });
+document.addEventListener('keydown', function(e){ if(e.key === 'Escape') closeWaMenu_(); });
+window.addEventListener('resize', closeWaMenu_);
+document.addEventListener('scroll', function(e){ const m = q('#waMenu'); if(m && e.target !== m && !m.contains(e.target)) closeWaMenu_(); }, true);
+
 /* ---- NEW: Log Visit verification display (INSIDE / OUTSIDE / LOCATION UNAVAILABLE + See Location) ---- */
 function visitToneAttr_(a){
   const m = { INSIDE:'background:#e7f6ec;color:#1d6f42;', OUTSIDE:'background:#fdecea;color:#b42318;', UNAVAILABLE:'background:#fdf2d8;color:#8a5a00;' };
-  return (a && a.kind === 'VISIT' && m[a.tone]) ? ' style="'+m[a.tone]+'"' : '';
+  return (a && (a.kind === 'VISIT' || a.kind === 'WHATSAPP') && m[a.tone]) ? ' style="'+m[a.tone]+'"' : '';
 }
 function visitMapLink_(a){
   return (a && a.mapUrl) ? ' <a href="'+esc(a.mapUrl)+'" target="_blank" rel="noopener" style="color:var(--primary-accent);font-weight:700;white-space:nowrap;">[See Location]</a>' : '';
