@@ -306,6 +306,27 @@
     .act-det a{color:var(--primary-accent);font-weight:600;}
     .act-notes{margin-top:2px;}
   </style>
+  <!-- NEW: iPhone (iOS) app-like support - additive; Android/desktop unaffected -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Emp Connect">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <style>
+    @supports (-webkit-touch-callout: none) {
+      html, body { overscroll-behavior-y: none; -webkit-text-size-adjust: 100%; }
+      * { -webkit-tap-highlight-color: transparent; }
+      body { -webkit-touch-callout: none; }
+      .topbar, .tabs, .tab-btn, .btn, .topbar-right button, .modal-head, .badge-emp { -webkit-user-select: none; user-select: none; }
+      input:not([type="checkbox"]):not([type="radio"]), select, textarea { font-size: 16px !important; }
+      #loginScreen, #appShell { min-height: 100dvh; }
+      .modal { max-height: 90dvh; }
+      .topbar { padding-top: calc(12px + env(safe-area-inset-top)); padding-left: calc(20px + env(safe-area-inset-left)); padding-right: calc(20px + env(safe-area-inset-right)); }
+      .tabs { padding-left: calc(20px + env(safe-area-inset-left)); padding-right: calc(20px + env(safe-area-inset-right)); }
+      .main { padding-left: calc(20px + env(safe-area-inset-left)); padding-right: calc(20px + env(safe-area-inset-right)); padding-bottom: calc(20px + env(safe-area-inset-bottom)); }
+      #loginScreen { padding-top: calc(20px + env(safe-area-inset-top)); padding-bottom: calc(20px + env(safe-area-inset-bottom)); }
+      .modal-overlay { padding-top: calc(16px + env(safe-area-inset-top)); padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
+      #toastHost { bottom: calc(20px + env(safe-area-inset-bottom)); }
+    }
+  </style>
 </head>
 <body>
 
@@ -4125,6 +4146,33 @@ if ('serviceWorker' in navigator) {
     });
   });
 }
+</script>
+<!-- NEW: iPhone "Add to Home Screen" hint - shows only on iOS, only when NOT already installed -->
+<div id="iosInstallHint" style="display:none;position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:9990;background:#fff;color:#101828;border-radius:14px;padding:14px 40px 14px 16px;box-shadow:0 8px 28px rgba(16,24,40,.28);font:14px/1.5 -apple-system,BlinkMacSystemFont,sans-serif;">
+  <button type="button" id="iosHintClose" aria-label="Close" style="position:absolute;top:6px;right:8px;border:0;background:none;font-size:20px;color:#667085;padding:6px 8px;">&#10005;</button>
+  <b>App ki tarah install karein</b><br>
+  <b>Share</b> button (&#11014;&#65038;) dabayein &rarr; <b>Add to Home Screen</b> &rarr; <b>Add</b>
+</div>
+<script>
+(function () {
+  try {
+    var ua = navigator.userAgent || '';
+    var isIOS = /iphone|ipad|ipod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    var standalone = window.navigator.standalone === true ||
+      (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+    var dismissed = false;
+    try { dismissed = localStorage.getItem('iosHintDismissed') === '1'; } catch (e) {}
+    if (!isIOS || standalone || dismissed) return;
+    var box = document.getElementById('iosInstallHint');
+    var btn = document.getElementById('iosHintClose');
+    if (!box || !btn) return;
+    setTimeout(function () { box.style.display = 'block'; }, 1500);
+    btn.addEventListener('click', function () {
+      box.style.display = 'none';
+      try { localStorage.setItem('iosHintDismissed', '1'); } catch (e) {}
+    });
+  } catch (e) {}
+})();
 </script>
 </body>
 </html>
