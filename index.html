@@ -4174,5 +4174,70 @@ if ('serviceWorker' in navigator) {
   } catch (e) {}
 })();
 </script>
+<!-- NEW: iPhone installed-app fix - open WhatsApp / Maps directly in their apps (no in-app browser sheet). Runs ONLY on iOS + installed app; everything else unchanged -->
+<script>
+(function () {
+  try {
+    var ua = navigator.userAgent || '';
+    var isIOS = /iphone|ipad|ipod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    var standalone = window.navigator.standalone === true ||
+      (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+    if (!isIOS || !standalone) return;
+
+    function toNative(href) {
+      try {
+        var u = new URL(href, location.href);
+        var h = u.hostname.replace(/^www\./, '');
+        var p = u.searchParams, parts = [];
+        if (h === 'wa.me' || (h === 'api.whatsapp.com' && u.pathname === '/send')) {
+          var num = (h === 'wa.me' ? u.pathname : (p.get('phone') || '')).replace(/\D/g, '');
+          var txt = p.get('text');
+          if (num) parts.push('phone=' + num);
+          if (txt) parts.push('text=' + encodeURIComponent(txt));
+          return 'whatsapp://send' + (parts.length ? '?' + parts.join('&') : '');
+        }
+        if ((h === 'google.com' && u.pathname.indexOf('/maps') === 0) || h === 'maps.google.com') {
+          var dest = p.get('destination'), org = p.get('origin'), q = p.get('query') || p.get('q');
+          if (!dest && !q) {
+            var seg = u.pathname.split('/').filter(Boolean);
+            var bad = seg.some(function (s) { return s.charAt(0) === '@' || s.indexOf('data=') === 0; });
+            if (!bad && seg[1] === 'dir' && seg.length >= 3 && seg.length <= 4) {
+              dest = decodeURIComponent(seg[seg.length - 1]);
+              if (seg.length === 4) org = decodeURIComponent(seg[2]);
+            }
+          }
+          if (dest) {
+            parts.push('daddr=' + encodeURIComponent(dest));
+            if (org) parts.push('saddr=' + encodeURIComponent(org));
+            parts.push('dirflg=d');
+          } else if (q) {
+            parts.push('q=' + encodeURIComponent(q));
+          } else { return null; }
+          return 'maps://?' + parts.join('&');
+        }
+      } catch (e) {}
+      return null;
+    }
+
+    var _open = window.open;
+    window.open = function (url) {
+      try {
+        var n = url ? toNative(String(url)) : null;
+        if (n) { window.location.href = n; return null; }
+      } catch (e) {}
+      return _open.apply(window, arguments);
+    };
+
+    document.addEventListener('click', function (ev) {
+      try {
+        var a = ev.target && ev.target.closest ? ev.target.closest('a[href]') : null;
+        if (!a) return;
+        var n = toNative(a.getAttribute('href'));
+        if (n) { ev.preventDefault(); window.location.href = n; }
+      } catch (e) {}
+    }, true);
+  } catch (e) {}
+})();
+</script>
 </body>
 </html>
