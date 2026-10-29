@@ -1635,7 +1635,7 @@ function openLeadStatusMenu_(el, leadId){
   m.id = 'leadStatusMenu'; m.className = 'lead-status-menu';
   m.innerHTML = LEAD_STATUSES_.map(function(s, i){
     return '<button type="button" class="'+(s===cur?'current':'')+'" onclick="pickLeadStatus_('+i+')">'+esc(s)+'</button>';
-  }).join('');
+  }).join('') + '<button type="button" onclick="pickLeadReassign_()">Reassignment</button>';
   document.body.appendChild(m);
   const r = el.getBoundingClientRect();
   const mh = m.offsetHeight, mw = m.offsetWidth;
@@ -1693,6 +1693,138 @@ function unassignLead_(leadId, leadName){
     })
     .withFailureHandler(onEmployeeSessionError)
     .apiEmployeeUnassignLead(ETOKEN, leadId);
+}
+
+/* ================= NEW: DUPLICATE LEAD LOOKUP (Add Customer) + CLAIM LEAD + REASSIGN LEAD ================= */
+let AC_LOOKUP_SEQ_ = 0;
+function checkAcDuplicate2_(){
+  clearTimeout(AC_DUP_TIMER_);
+  const box = q('#acDuplicate'); if(!box) return;
+  const mobile = q('#acMobile').value.trim();
+  const seq = ++AC_LOOKUP_SEQ_;
+  if(mobile.replace(/\D/g,'').length < 10){ box.className='hidden'; box.innerHTML=''; return; }   // only a COMPLETE number is checked
+  AC_DUP_TIMER_ = setTimeout(function(){
+    google.script.run
+      .withSuccessHandler(function(res){
+        if(seq !== AC_LOOKUP_SEQ_ || !q('#acDuplicate')) return;   // ignore outdated replies
+        paintAcLookup_(res);
+      })
+      .withFailureHandler(function(){})
+      .apiEmployeeLookupLeadByPhone(ETOKEN, mobile);
+  }, 400);
+}
+function acLeadLine_(label, v){
+  return v ? '<div style=\"margin-top:4px;\">'+esc(label)+': <strong>'+esc(v)+'</strong></div>' : '';
+}
+function paintAcLookup_(res){
+  const box = q('#acDuplicate'); if(!box) return;
+  if(!res || !res.found){ box.className='hidden'; box.innerHTML=''; return; }
+  box.className = 'duplicate-warning';
+  if(res.type === 'customer'){
+    box.innerHTML = 'Already in CRM as <strong>'+esc(res.customerName)+'</strong> ('+esc(res.customerId)+'), assigned to <strong>'+esc(res.assignedTo||'Unassigned')+'</strong>.';
+    return;
+  }
+  if(res.state === 'unassigned'){
+    box.innerHTML = '⚠️ This lead already exists and is currently unassigned.' +
+      acLeadLine_('Lead', res.name) + acLeadLine_('Phone', res.phoneNo) + acLeadLine_('Status', res.status) + acLeadLine_('Area', res.area) +
+      '<button type=\"button\" class=\"btn btn-primary\" id=\"acClaimBtn\" style=\"margin-top:10px;width:100%;\" onclick=\"claimAcLead_(\\''+esc(res.leadId)+'\\')\">Claim This Lead</button>';
+  } else if(res.state === 'mine'){
+    box.innerHTML = '✅ This lead is already in your <strong>My Leads</strong>.' + acLeadLine_('Lead', res.name) + acLeadLine_('Status', res.status);
+  } else {
+    box.innerHTML = '⚠️ This lead is already assigned to <strong>'+esc(res.assignedToName||'another employee')+'</strong>.' +
+      acLeadLine_('Lead', res.name) + acLeadLine_('Status', res.status);
+  }
+}
+function claimAcLead_(leadId){
+  const btn = q('#acClaimBtn'); if(btn){ btn.disabled = true; btn.textContent = 'Claiming...'; }
+  google.script.run
+    .withSuccessHandler(function(res){
+      if(res && res.success){
+        showToast('Lead claimed - it is now in your My Leads.', 'ok');
+        closeModal();
+        MY_LEADS_LOADED_ = false;
+        delete LEAD_DETAIL_CACHE_[leadId];
+        if(q('#mcLeadBox')){ MC_MODE_ = 'leads'; applyMcMode_(); }   // show the claimed lead right away
+      } else {
+        if(btn){ btn.disabled = false; btn.textContent = 'Claim This Lead'; }
+        showToast((res && res.message) || 'Could not claim this lead.', 'err');
+        checkAcDuplicate2_();   // refresh the warning (shows the new owner if someone else just claimed it)
+      }
+    })
+    .withFailureHandler(function(err){ if(btn){ btn.disabled = false; btn.textContent = 'Claim This Lead'; } onEmployeeSessionError(err); })
+    .apiEmployeeClaimLead(ETOKEN, leadId);
+}
+
+/* ---- Reassignment (status menu -> "Reassignment") ---- */
+let RA_ = { leadId:'', name:'', phone:'', list:[], sel:-1 };
+function pickLeadReassign_(){
+  const leadId = LS_MENU_LEAD_;
+  closeLeadStatusMenu_();
+  if(leadId) openLeadReassignModal_(leadId);
+}
+function openLeadReassignModal_(leadId){
+  const l = findLeadInCache_(leadId); if(!l) return;
+  RA_ = { leadId: leadId, name: l.name || '', phone: l.phoneNo || '', list: [], sel: -1 };
+  q('#modalHost').innerHTML =
+    '<div class=\"modal-overlay\" onclick=\"if(event.target===this) closeModal()\"><div class=\"modal\" style=\"max-width:460px;\">' +
+      '<div class=\"modal-head\"><h3>Reassign Lead</h3><button class=\"modal-close\" onclick=\"closeModal()\">&times;</button></div>' +
+      '<div class=\"modal-body\">' +
+        '<p style=\"margin:0 0 12px;font-size:13.5px;\">Lead: <strong>'+esc(RA_.name||'—')+'</strong><br>Mobile: <strong>'+esc(RA_.phone||'—')+'</strong></p>' +
+        '<div class=\"field\"><label>Reassign to</label><input type=\"text\" id=\"raSearch\" placeholder=\"Search employee name or ID...\" oninput=\"paintReassignList_()\" autocomplete=\"off\"></div>' +
+        '<div id=\"raList\" style=\"max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;\"><div class=\"empty-state\">Loading employees...</div></div>' +
+        '<p id=\"raSel\" style=\"font-size:12.5px;color:var(--text-2);margin:10px 0 0;\">No employee selected.</p>' +
+      '</div>' +
+      '<div class=\"modal-actions\"><button class=\"btn btn-primary\" id=\"raSaveBtn\" disabled onclick=\"saveReassign_()\">Reassign</button><button class=\"btn btn-ghost\" onclick=\"closeModal()\">Cancel</button></div>' +
+    '</div></div>';
+  google.script.run
+    .withSuccessHandler(function(res){
+      if(RA_.leadId !== leadId || !q('#raList')) return;
+      if(res && res.success){ RA_.list = res.employees || []; paintReassignList_(); }
+      else { q('#raList').innerHTML = '<div class=\"empty-state\">'+esc((res && res.message) || 'Could not load employees.')+'</div>'; }
+    })
+    .withFailureHandler(function(err){ closeModal(); onEmployeeSessionError(err); })
+    .apiEmployeeListEligibleEmployees(ETOKEN);
+}
+function paintReassignList_(){
+  const host = q('#raList'); if(!host) return;
+  const term = (q('#raSearch') ? q('#raSearch').value : '').trim().toLowerCase();
+  const rows = [];
+  RA_.list.forEach(function(e, i){
+    if(term && String(e.name||'').toLowerCase().indexOf(term) === -1 && String(e.employeeId||'').toLowerCase().indexOf(term) === -1) return;
+    const on = (i === RA_.sel);
+    rows.push('<button type=\"button\" onclick=\"pickReassignEmp_('+i+')\" style=\"display:block;width:100%;text-align:left;padding:9px 12px;border:none;border-bottom:1px solid var(--border);background:'+(on?'var(--primary-light)':'transparent')+';cursor:pointer;font-size:13.5px;'+(on?'font-weight:700;':'')+'\">'+esc(e.name)+' <span style=\"color:var(--text-2);font-size:12px;\">('+esc(e.employeeId)+')</span></button>');
+  });
+  host.innerHTML = rows.length ? rows.join('') : '<div class=\"empty-state\">No matching employee.</div>';
+}
+function pickReassignEmp_(i){
+  const e = RA_.list[i]; if(!e) return;
+  RA_.sel = i;
+  paintReassignList_();
+  if(q('#raSel')) q('#raSel').innerHTML = 'Selected: <strong>'+esc(e.name)+'</strong> ('+esc(e.employeeId)+')';
+  if(q('#raSaveBtn')) q('#raSaveBtn').disabled = false;
+}
+function saveReassign_(){
+  const e = RA_.list[RA_.sel];
+  if(!e){ showToast('Select an employee first.', 'err'); return; }
+  if(!confirm('Reassign "'+RA_.name+'" ('+RA_.phone+') to '+e.name+' ('+e.employeeId+')?\n\nThe lead will move out of your My Leads into theirs. Its status and notes stay unchanged.')) return;
+  const leadId = RA_.leadId;
+  const btn = q('#raSaveBtn'); btn.disabled = true; btn.textContent = 'Saving...';
+  google.script.run
+    .withSuccessHandler(function(res){
+      if(res && res.success){
+        MY_LEADS_CACHE = MY_LEADS_CACHE.filter(function(x){ return x.leadId !== leadId; });
+        delete LEAD_DETAIL_CACHE_[leadId];
+        MY_LEADS_LOADED_ = false;
+        closeModal();
+        showToast('Lead reassigned to '+(res.assignedToName || e.name)+'.', 'ok');
+        paintMyLeads_();
+      } else {
+        btn.disabled = false; btn.textContent = 'Reassign';
+        showToast((res && res.message) || 'Could not reassign lead.', 'err');
+      }
+    })
+    .withFailureHandler(function(err){ btn.disabled = false; btn.textContent = 'Reassign'; onEmployeeSessionError(err); })
+    .apiEmployeeReassignLead(ETOKEN, leadId, e.employeeId);
 }
 
 /* ---- NEW: Convert Lead (Direct/Indirect + pick an EXISTING customer) ---- */
@@ -2930,7 +3062,7 @@ function openAddCustomerModal(){
       '<div class="modal-body">' +
         '<div id="acDuplicate" class="hidden"></div>' +
         '<div class="field"><label>Customer / Shop Name *</label><input type="text" id="acName"></div>' +
-        '<div class="field"><label>Mobile Number *</label><input type="text" id="acMobile" oninput="checkAcDuplicate_()"></div>' +
+                '<div class=\"field\"><label>Mobile Number *</label><input type=\"text\" id=\"acMobile\" oninput=\"checkAcDuplicate2_()\"></div>' +
         '<div class="field"><label>Email (optional)</label><input type="text" id="acEmail"></div>' +
         '<div class="field"><label>Opening Balance (optional)</label><input type="number" id="acOpening" value="0"></div>' +
         '<div class="field"><label>Address (optional)</label><textarea id="acAddress" rows="2"></textarea></div>' +
