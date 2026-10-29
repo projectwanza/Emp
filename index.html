@@ -1384,6 +1384,8 @@ function paintMyLeads_(){
        String(l.area||'').toLowerCase().indexOf(term)===-1) return false;
     // NEW: Advanced Filter - multi-status OR match
     if(ML_ADV_.active && ML_ADV_.statuses.indexOf(String(l.status||'').trim())===-1) return false;
+    // NEW: "Converted" leads are hidden by default - they show only when "Converted" is ticked in Advanced Filter
+    if(!ML_ADV_.active && String(l.status||'').trim() === 'Converted') return false;
     return true;
   });
   ML_LAST_LIST_ = list; // NEW - exactly what's currently visible (search + filter applied)
