@@ -1727,7 +1727,7 @@ function paintAcLookup_(res){
   if(res.state === 'unassigned'){
     box.innerHTML = '⚠️ This lead already exists and is currently unassigned.' +
       acLeadLine_('Lead', res.name) + acLeadLine_('Phone', res.phoneNo) + acLeadLine_('Status', res.status) + acLeadLine_('Area', res.area) +
-      '<button type=\"button\" class=\"btn btn-primary\" id=\"acClaimBtn\" style=\"margin-top:10px;width:100%;\" onclick=\"claimAcLead_(\\''+esc(res.leadId)+'\\')\">Claim This Lead</button>';
+      '<button type="button" class="btn btn-primary" id="acClaimBtn" style="margin-top:10px;width:100%;" onclick="claimAcLead_(\''+esc(res.leadId)+'\')">Claim This Lead</button>';
   } else if(res.state === 'mine'){
     box.innerHTML = '✅ This lead is already in your <strong>My Leads</strong>.' + acLeadLine_('Lead', res.name) + acLeadLine_('Status', res.status);
   } else {
