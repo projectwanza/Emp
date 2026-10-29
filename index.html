@@ -1397,6 +1397,7 @@ function paintMyLeads_(){
           '<button class="icon-btn" title="Edit Lead" onclick="openLeadEditModal_(\''+lid+'\')">✏️</button> ' +
           '<button class="icon-btn add-visit" title="Add Note" onclick="openLeadNoteModal_(\''+lid+'\',\''+esc(l.name||'')+'\')">+</button> ' +
           leadLocationBtn_(l) + ' ' +
+          '<button class="icon-btn" title="Create Order" onclick="event.stopPropagation();openCreateOrderModal_(\''+lid+'\',\''+esc(l.name||'')+'\',\''+esc(l.address||'')+'\',\''+esc(l.latLong||'')+'\',\''+esc(l.phoneNo||'')+'\',\'lead\')">📦+</button> ' +
           '<button class="icon-btn" title="WhatsApp" onclick="event.stopPropagation();openWaMenu_(this,\'lead\',\''+lid+'\')">💬</button>' +
         '</td>' +
         '<td>'+esc(l.area||'—')+'</td>' +
@@ -1422,6 +1423,7 @@ function paintMyLeads_(){
           '<button class="icon-btn" title="Edit Lead" onclick="openLeadEditModal_(\''+lid+'\')">✏️</button> ' +
           '<button class="icon-btn add-visit" title="Add Note" onclick="openLeadNoteModal_(\''+lid+'\',\''+esc(l.name||'')+'\')">+</button> ' +
           leadLocationBtn_(l) + ' ' +
+          '<button class="icon-btn" title="Create Order" onclick="event.stopPropagation();openCreateOrderModal_(\''+lid+'\',\''+esc(l.name||'')+'\',\''+esc(l.address||'')+'\',\''+esc(l.latLong||'')+'\',\''+esc(l.phoneNo||'')+'\',\'lead\')">📦+</button> ' +
           '<button class="icon-btn" title="WhatsApp" onclick="event.stopPropagation();openWaMenu_(this,\'lead\',\''+lid+'\')">💬</button>' +
         '</div>' +
       '</div>';
@@ -2030,7 +2032,7 @@ function leadTlClass_(kind){
     case 'STATUS_CHANGED': return 't-status';
     case 'LEAD_CONVERTED': case 'CUSTOMER_CONVERTED': return 't-convert';
     case 'TAG_REMOVED': return 't-remove';
-    case 'LEAD_CREATED': case 'LEAD_ASSIGNED': case 'LEAD_REASSIGNED': case 'TAG_ADDED': return 't-create';
+    case 'LEAD_CREATED': case 'LEAD_ASSIGNED': case 'LEAD_REASSIGNED': case 'TAG_ADDED': case 'ORDER_CREATED': return 't-create';
     case 'LEAD_UPDATED': case 'ACTIVITY_CHANGED': case 'VISIT_ACTION': return 't-edit';
     default: return '';
   }
@@ -3770,7 +3772,7 @@ function shareEmployeeOrderWhatsApp_(orderId){
 
   msg += '*ORDER DETAILS*\n' + DIV + '\n';
   msg += '*Order No.:* ' + o.orderNo + '\n';
-  msg += '*Customer:* ' + o.customerName + '\n';
+  msg += (o.orderFor === 'Lead' ? '*Lead:* ' : '*Customer:* ') + o.customerName + '\n';
   if(o.customerMobile) msg += '*Mobile No.:* ' + o.customerMobile + '\n';
   if(o.customerAddress) msg += '*Address:* ' + o.customerAddress + '\n';
   if(mapsLink) msg += '*Location:* ' + mapsLink + '\n';
@@ -3792,19 +3794,19 @@ function shareEmployeeOrderWhatsApp_(orderId){
   window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
 }
 
-function openCreateOrderModal_(customerId, customerName, customerAddress, customerLatLong, customerMobile){
+function openCreateOrderModal_(customerId, customerName, customerAddress, customerLatLong, customerMobile, entityType){
   ORDER_ITEM_ROWS_ = [{ productName:'', quantity:'', remark:'' }];
   q('#modalHost').innerHTML =
     '<div class="modal-overlay" onclick="if(event.target===this) closeModal()"><div class="modal">' +
       '<div class="modal-head"><h3>Create New Order</h3><button class="modal-close" onclick="closeModal()">&times;</button></div>' +
       '<div class="modal-body">' +
-        '<div class="field"><label>Customer Name</label><input type="text" value="'+esc(customerName)+'" disabled></div>' +
+        '<div class="field"><label>'+(entityType === 'lead' ? 'Lead Name' : 'Customer Name')+'</label><input type="text" value="'+esc(customerName)+'" disabled></div>' +
         '<div class="field"><label>Order Date</label><input type="text" value="'+new Date().toLocaleString()+'" disabled></div>' +
         '<label style="font-size:13px;font-weight:600;display:block;margin:10px 0 6px;">Products</label>' +
         '<div id="orderItemRows"></div>' +
         '<button class="btn btn-ghost" style="margin-top:6px;" onclick="addOrderItemRow_()">+ Add Product</button>' +
       '</div>' +
-      '<div class="modal-actions"><button class="btn btn-primary" id="orderSaveBtn" onclick="saveOrder_(\''+esc(customerId)+'\',\''+esc(customerName)+'\',\''+esc(customerAddress||'')+'\',\''+esc(customerLatLong||'')+'\',\''+esc(customerMobile||'')+'\')">Create Order</button><button class="btn btn-ghost" onclick="closeModal()">Cancel</button></div>' +
+      '<div class="modal-actions"><button class="btn btn-primary" id="orderSaveBtn" onclick="saveOrder_(\''+esc(customerId)+'\',\''+esc(customerName)+'\',\''+esc(customerAddress||'')+'\',\''+esc(customerLatLong||'')+'\',\''+esc(customerMobile||'')+'\',\''+(entityType === 'lead' ? 'lead' : '')+'\')">Create Order</button><button class="btn btn-ghost" onclick="closeModal()">Cancel</button></div>' +
     '</div></div>';
   paintOrderItemRows_();
 }
@@ -3834,7 +3836,7 @@ function removeOrderItemRow_(idx){
   paintOrderItemRows_();
 }
 
-function saveOrder_(customerId, customerName, customerAddress, customerLatLong, customerMobile){
+function saveOrder_(customerId, customerName, customerAddress, customerLatLong, customerMobile, entityType){
   const items = ORDER_ITEM_ROWS_
     .map(function(r){ return { productName: (r.productName||'').trim(), quantity: Number(r.quantity)||0, remark: (r.remark||'').trim() }; })
     .filter(function(r){ return r.productName && r.quantity>0; });
@@ -3845,20 +3847,21 @@ function saveOrder_(customerId, customerName, customerAddress, customerLatLong, 
       btn.disabled=false; btn.textContent='Create Order';
       if(res && res.success){
         showToast('Order '+res.orderNo+' created.', 'ok');
-        refreshMyCustomersSilently_();
+        if(entityType === 'lead'){ delete LEAD_DETAIL_CACHE_[customerId]; refreshMyLeadsSilently_(); }   // NEW - lead's Last Activity updates
+        else refreshMyCustomersSilently_();
         if(q('#ordersList')) loadMyOrders_();
-        showOrderCreatedModal_(res.orderNo, customerName, items, customerAddress, customerLatLong, customerMobile);
+        showOrderCreatedModal_(res.orderNo, customerName, items, customerAddress, customerLatLong, customerMobile, entityType);
       }
       else { showToast((res && res.message) || 'Failed to create order.', 'err'); }
     })
     .withFailureHandler(function(){ btn.disabled=false; btn.textContent='Create Order'; showToast('Failed to create order.', 'err'); })
-    .apiEmployeeCreateOrder(ETOKEN, customerId, items);
+    .apiEmployeeCreateOrder(ETOKEN, customerId, items, entityType || '');
 }
 
 // NEW: keeps the flow inside the same popup - shows what was just
 // created plus a WhatsApp button, so no trip to the Orders page needed.
-function showOrderCreatedModal_(orderNo, customerName, items, customerAddress, customerLatLong, customerMobile){
-  LAST_CREATED_ORDER_ = { orderNo: orderNo, customerName: customerName, items: items, orderDate: new Date().toLocaleString(), customerAddress: customerAddress||'', customerLatLong: customerLatLong||'', customerMobile: customerMobile||'' };
+function showOrderCreatedModal_(orderNo, customerName, items, customerAddress, customerLatLong, customerMobile, entityType){
+  LAST_CREATED_ORDER_ = { entityType: entityType || '', orderNo: orderNo, customerName: customerName, items: items, orderDate: new Date().toLocaleString(), customerAddress: customerAddress||'', customerLatLong: customerLatLong||'', customerMobile: customerMobile||'' };
   q('#modalHost').innerHTML =
     '<div class="modal-overlay" onclick="if(event.target===this) closeModal()"><div class="modal">' +
       '<div class="modal-head"><h3>Order Created</h3><button class="modal-close" onclick="closeModal()">&times;</button></div>' +
@@ -3884,7 +3887,7 @@ function shareCreatedOrderWhatsApp_(){
   let msg = 'Dear Team,\n*A NEW ORDER HAS BEEN GENERATED*\n\n';
   msg += '*ORDER DETAILS*\n' + DIV + '\n';
   msg += '*Order No.:* ' + o.orderNo + '\n';
-  msg += '*Customer:* ' + o.customerName + '\n';
+  msg += (o.entityType === 'lead' ? '*Lead:* ' : '*Customer:* ') + o.customerName + '\n';
   if(o.customerMobile) msg += '*Mobile No.:* ' + o.customerMobile + '\n';
   if(o.customerAddress) msg += '*Address:* ' + o.customerAddress + '\n';
   if(mapsLink) msg += '*Location:* ' + mapsLink + '\n';
