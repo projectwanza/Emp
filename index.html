@@ -494,6 +494,8 @@ function enterEmployee(){
   q('#loginScreen').style.display='none';
   q('#appShell').style.display='block';
   q('#topEmpName').textContent = EMP_NAME || 'EMPLOYEE';
+  EMP_PHONE_ = '';          // NEW: never reuse a previous employee's number
+  loadEmpProfile_();        // NEW: fetch logged-in employee's mobile for WhatsApp messages
   switchEmpTab('dashboard');
 }
 
@@ -3138,6 +3140,45 @@ const WA_MESSAGES_ = {
     'Stay Connected • Stay Updated • Grow Together'
   ].join('\n') }
 };
+/* ---- NEW: dynamic WhatsApp text with logged-in employee's name + mobile ---- */
+let EMP_PHONE_ = '';
+function loadEmpProfile_(){
+  if(!ETOKEN) return;
+  google.script.run
+    .withSuccessHandler(function(res){
+      if(res && res.success){ EMP_PHONE_ = String(res.phone || '').replace(/\D/g,'').slice(-10); }
+    })
+    .withFailureHandler(function(){ /* silent - messages fall back safely */ })
+    .apiEmployeeGetMyProfile(ETOKEN);
+}
+function waMessageText_(key, fallbackText){
+  const COMPANY_NO = '6291019367';
+  const name = String(EMP_NAME || '').trim();
+  const mob = String(EMP_PHONE_ || '').replace(/\D/g,'').slice(-10);
+  const enquiry = [
+    '🛒 Order / Product Enquiry:',
+    '📞 ' + ((mob && mob !== COMPANY_NO) ? (mob + ' | ') : '') + COMPANY_NO
+  ];
+  if(name) enquiry.push('👤 Contact Person: ' + name);
+
+  if(key === 'VISIT'){
+    return [
+      '🙏 Dear Sir,', '',
+      'Recently, we visited your shop. If you need any products or have any enquiries, please feel free to contact us. 😊', ''
+    ].concat(enquiry, ['', '🤝 Stay Connected • Stay Updated • Grow Together']).join('\n');
+  }
+  if(key === 'JOIN'){
+    return [
+      '📢 JOIN OUR WHATSAPP COMMUNITY', '',
+      '📦 Latest Products | New Arrivals | Exclusive Offers & Updates', '',
+      '👉 A&R Official Community',
+      'https://chat.whatsapp.com/JPCT78GTBYCIxhECfgF1J8', '',
+      '👉 Mobile Accessories Community',
+      'https://chat.whatsapp.com/KgqTOGfS5SRE6dKMvEthLD', ''
+    ].concat(enquiry, ['', '🤝 Stay Connected • Stay Updated • Grow Together']).join('\n');
+  }
+  return fallbackText;   // any other key keeps its original text
+}
 let WA_MENU_CTX_ = null;
 function closeWaMenu_(){ const m = q('#waMenu'); if(m) m.remove(); WA_MENU_CTX_ = null; }
 function openWaMenu_(el, type, id){
@@ -3169,7 +3210,8 @@ function pickWaMessage_(key){
   if(digits.length < 10){ showToast('Phone number not available.', 'err'); return; }
   const num = (digits.length >= 12 && digits.indexOf('91') === 0) ? digits : ('91' + digits.slice(-10));
   const locP = captureLocation_();                   // GPS starts right now, in the same click
-  window.open('https://wa.me/' + num + '?text=' + encodeURIComponent(msg.text), '_blank');   // opens instantly - you check the message and press Send yourself
+  if(!EMP_PHONE_) loadEmpProfile_();   // NEW: retry in background if the profile had not loaded yet
+  window.open('https://wa.me/' + num + '?text=' + encodeURIComponent(waMessageText_(key, msg.text)), '_blank');   // opens instantly - you check the message and press Send yourself
   locP.then(function(loc){                           // the record is saved in the background, with the location
     google.script.run
       .withSuccessHandler(function(){})
