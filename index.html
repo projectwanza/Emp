@@ -2853,6 +2853,7 @@ function paintMyCustomers_(){
 /* ---- Customer profile (basic info + full transaction history) ---- */
 
 function openCustomerProfile(customerId){
+  return openCustomerDetail_(customerId);   // NEW: complete Customer Detail page (old body below is kept, now unused)
   const main = q('#mainContent');
   main.innerHTML = '<button class="back-link" onclick="renderMyCustomers()">&larr; Back to My Customers</button><div class="skeleton" style="height:200px"></div>';
   google.script.run
@@ -2977,6 +2978,212 @@ function openCustomerProfile(customerId){
     .apiEmployeeGetCustomerProfile(ETOKEN, customerId);
 }
 
+/* ================= NEW: COMPLETE CUSTOMER DETAIL PAGE (same layout as the Lead Detail page) ================= */
+let CUST_DETAIL_OPEN_ = '';     // customerId currently on screen
+let CUST_DETAIL_CACHE_ = {};    // customerId -> last server response (instant repaint, then quiet refresh)
+let CUST_LIST_STATE_ = null;    // My Customers search / day chip / filter-panel / scroll, saved while a customer is open
+
+function custBackBtn_(){ return '<button class="back-link" id="custBackBtn" onclick="backToMyCustomers_()">&larr; Back to My Customers</button>'; }
+
+// Remembers the list screen (search text, day chip, Advanced Filter panel, scroll) - Advanced Filter itself already lives in MC_ADV_.
+function saveCustListState_(){
+  if(MC_MODE_ !== 'customers' || !q('#mcList') || !q('#mcSearch')) return;   // not opened from the list: keep what was saved
+  const adv = q('#mcAdvPanel');
+  CUST_LIST_STATE_ = { search: q('#mcSearch').value, day: MC_DAY_FILTER, advOpen: !!(adv && !adv.classList.contains('hidden')), scroll: window.pageYOffset || 0 };
+}
+function backToMyCustomers_(){
+  CUST_DETAIL_OPEN_ = '';
+  const st = CUST_LIST_STATE_; CUST_LIST_STATE_ = null;
+  MC_MODE_ = 'customers';
+  renderMyCustomers();                      // instant from cache, quiet refresh in background
+  if(!st) return;
+  const s = q('#mcSearch'); if(s) s.value = st.search || '';
+  MC_DAY_FILTER = st.day || '';
+  if(st.advOpen){ const p = q('#mcAdvPanel'); if(p) p.classList.remove('hidden'); }
+  paintMcAdvBtn_(); paintMcDayFilters_(); paintMyCustomers_();
+  window.scrollTo(0, st.scroll || 0);
+}
+
+// Ledger rows + summary totals. SAME signed rules as the old profile ledger (Sale: +balanceAmount,
+// Credit Note: -amount, Payment-in: -(received+paid), Payment-out: +(received+paid)); totals are added in the same pass.
+function custLedgerDesc_(t){
+  if(t.description) return t.description;
+  if(t.transactionType === 'Sale') return 'Sale Invoice';
+  if(t.transactionType === 'Payment-in') return 'Payment Received';
+  if(t.transactionType === 'Payment-out') return 'Payment Paid';
+  if(t.transactionType === 'Credit Note') return 'Credit Note';
+  if(t.transactionType === 'Estimate' || t.transactionType === 'Quotation') return 'Estimate / Quotation';
+  return t.transactionType || '—';
+}
+function custLedger_(p, txns){
+  const chrono = txns.slice().sort(function(a, b){
+    const d = (a.dateRaw||0) - (b.dateRaw||0);
+    if (d !== 0) return d;
+    return (a.rowNumber||0) - (b.rowNumber||0);
+  });
+  let running = Number(p.openingBalance) || 0;
+  const T = { sales:0, received:0, creditNote:0, paymentOut:0 };
+  let lastSale = null, lastPay = null;
+  const rows = chrono.map(function(t){
+    let debit = 0, credit = 0;
+    if(t.transactionType === 'Sale'){ credit = Number(t.balanceAmount)||0; running += credit; T.sales += Number(t.amount)||0; if(!lastSale || (t.dateRaw||0) >= (lastSale.dateRaw||0)) lastSale = t; }
+    else if(t.transactionType === 'Credit Note'){ debit = Number(t.amount)||0; running -= debit; T.creditNote += debit; }
+    else if(t.transactionType === 'Payment-in'){ debit = (Number(t.receivedAmount)||0) + (Number(t.paidAmount)||0); running -= debit; T.received += debit; if(!lastPay || (t.dateRaw||0) >= (lastPay.dateRaw||0)) lastPay = t; }
+    else if(t.transactionType === 'Payment-out'){ credit = (Number(t.receivedAmount)||0) + (Number(t.paidAmount)||0); running += credit; T.paymentOut += credit; }
+    return '<tr><td>'+esc(t.date)+'</td><td>'+esc(t.transactionType)+'</td><td>'+esc(t.refNo||'—')+'</td><td>'+esc(custLedgerDesc_(t))+'</td>' +
+      '<td>'+(debit ? money(debit) : '—')+'</td><td>'+(credit ? money(credit) : '—')+'</td>' +
+      '<td style="font-weight:700;color:'+(running>0?'#c0392b':'#101828')+'">'+money(running)+'</td></tr>';
+  });
+  return { rows: rows, totals: T, lastSaleDate: lastSale ? lastSale.date : '', lastPaymentDate: lastPay ? lastPay.date : '' };
+}
+
+function renderCustomerDetail_(res){
+  const main = q('#mainContent'); if(!main) return;
+  const p = res.profile, txns = res.transactions || [], act = res.activity || [], conv = res.convertedHistory || [];
+  const cid = esc(p.customerId), nm = esc(p.customerName);
+  const item = function(k, v, span){ return '<div class="profile-item'+(span?' span2':'')+'"><div class="k">'+k+'</div><div class="v">'+(v ? esc(v) : '—')+'</div></div>'; };
+  const itemHtml = function(k, html, span){ return '<div class="profile-item'+(span?' span2':'')+'"><div class="k">'+k+'</div><div class="v">'+html+'</div></div>'; };
+  const ll = String(p.latLong||'').split(',');
+  const lat = ll.length === 2 ? ll[0].trim() : '', lng = ll.length === 2 ? ll[1].trim() : '';
+  const hasLoc = !!(lat && lng) || !!String(p.address||'').trim();
+  const cached = (typeof MY_CUSTOMERS_CACHE !== 'undefined' ? MY_CUSTOMERS_CACHE : []).filter(function(c){ return String(c.customerId||'') === String(p.customerId||''); })[0];
+  const tags = cached && cached.tags && cached.tags.length ? cached.tags.join(', ') : '';
+  const photoHtml = /^https?:\/\//i.test(p.photo||'') ? '<a href="'+esc(p.photo)+'" target="_blank" rel="noopener" style="color:var(--primary-accent);"><img src="'+esc(leadPhotoThumb_(p.photo))+'" alt="Shop photo" style="display:block;max-width:100%;max-height:160px;border-radius:8px;border:1px solid var(--border);margin-bottom:4px;">View Photo</a>' : esc(p.photo||'—');
+  const L = custLedger_(p, txns);
+  const totalNotes = act.filter(function(a){ return a.kind === 'NOTE_ADDED'; }).length;
+  const totalVisits = act.filter(function(a){ return a.kind === 'VISIT'; }).length;
+  const lastAct = act[0];
+  const mob = esc(p.mobile||'');
+  main.innerHTML =
+    custBackBtn_() +
+    '<div class="page-header"><div><h2>'+nm+'</h2><p>'+cid+(p.pipelineStatus ? ' &middot; '+esc(p.pipelineStatus) : '')+'</p></div>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
+        '<button class="icon-btn" title="Call Customer" onclick="callCustomer_(\''+mob+'\',\''+cid+'\')">📞</button>' +
+        '<button class="icon-btn add-visit" title="Add Note" onclick="openCustomerNoteModal_(\''+cid+'\',\''+nm+'\')">+</button>' +
+        '<button class="btn btn-ghost" onclick="openCustomerContactModal_(\''+cid+'\',\''+nm+'\',\''+mob+'\',\''+esc(p.address||'')+'\',\''+esc(p.latLong||'')+'\')">✏️ Edit Customer</button>' +
+        '<button class="btn btn-ghost" onclick="openPaymentTermsModal_(\''+cid+'\',\''+nm+'\','+(Number(p.paymentTermsDays)||0)+')">🗓️ Payment Terms</button>' +
+      '</div></div>' +
+    '<div class="card"><div class="card-header"><h3>Customer Information</h3></div><div class="card-body"><div class="profile-grid">' +
+      item('Customer ID', p.customerId) + item('Customer Name', p.customerName) +
+      item('Owner Name', p.ownerName) + item('Customer Status', p.pipelineStatus) +
+      item('Account Status', p.status) + item('Customer Category (Tags)', tags) +
+      item('Priority', p.priority) + item('Shop Ownership', p.ownership) +
+      item('Shop Size', p.shopSize) + item('Shop Services', p.shopServices) +
+      item('Visited Day', p.visitedDay) + item('Shop Status', p.shopStatus) +
+      item('Party / CLI No', p.cliNo) + item('Customer Created Date', p.createdAt) +
+      item('Remarks / Notes', p.remark, true) +
+    '</div></div></div>' +
+    '<div class="card section-gap"><div class="card-header"><h3>Contact &amp; Location</h3></div><div class="card-body"><div class="profile-grid">' +
+      item('Primary Mobile Number', p.mobile) + item('Alternate Mobile Number', p.altMobile) +
+      item('Email', p.email) + item('Area', p.area) +
+      item('Full Address', p.address, true) +
+      item('Latitude', lat) + item('Longitude', lng) +
+      itemHtml('Customer Location', hasLoc ? '<button class="btn btn-ghost" style="padding:5px 12px;font-size:12px;" onclick="openCustomerLocation_(\''+esc(p.latLong||'')+'\',\''+esc(p.address||'')+'\')">📍 See Location</button>' : '—') +
+      itemHtml('Photo', photoHtml) +
+    '</div></div></div>' +
+    '<div class="card section-gap"><div class="card-header"><h3>Customer Assignment</h3></div><div class="card-body"><div class="profile-grid">' +
+      item('Assigned Executive', p.assignedTo) + item('Converted From Lead By', conv.length ? conv[0].convertedBy : '') +
+      item('Customer Created Date', p.createdAt) + item('Last Activity Date', lastAct ? lastAct.dateTime : '') +
+      item('Total Notes', String(totalNotes)) + item('Total Visits', String(totalVisits)) +
+    '</div></div></div>' +
+    '<div class="card section-gap"><div class="card-header"><h3>Financial &amp; Transaction Summary</h3></div><div class="card-body"><div class="profile-grid">' +
+      itemHtml('Opening Balance', money(p.openingBalance)) +
+      itemHtml('Current Outstanding Balance', '<span style="font-weight:700;color:'+(p.outstanding>0?'#c0392b':'#101828')+'">'+money(p.outstanding)+'</span>') +
+      itemHtml('Total Sales', money(L.totals.sales)) + itemHtml('Total Payment Received', money(L.totals.received)) +
+      itemHtml('Total Credit Note', money(L.totals.creditNote)) + itemHtml('Total Payment Out', money(L.totals.paymentOut)) +
+      item('Last Sale Date', L.lastSaleDate || p.lastSaleDate) + item('Last Payment Date', L.lastPaymentDate) +
+      itemHtml('Payment Terms (Due Date)', p.paymentTermsDays ? esc(p.paymentTermsDays)+' days after invoice date' : 'Not set', true) +
+    '</div></div></div>' +
+    (conv.length ? '<div class="card section-gap"><div class="card-header"><h3>Converted History</h3></div><div class="card-body">' +
+      conv.map(function(c){
+        return '<div class="conv-history-card">' +
+          '<div style="font-weight:700;font-size:13.5px;">'+esc(c.leadName||'—')+'</div>' +
+          '<div style="font-size:12px;color:var(--text-2);margin-top:2px;">Lead ID: '+esc(c.leadId)+' &middot; Type: '+esc(c.conversionType)+'</div>' +
+          '<div style="font-size:12px;color:var(--text-2);">Converted: '+esc(c.dateTime||'—')+' &middot; By: '+esc(c.convertedBy||'—')+'</div>' +
+          (c.remark ? '<div style="font-size:12.5px;margin-top:4px;">Remark: '+esc(c.remark)+'</div>' : '') +
+        '</div>';
+      }).join('') + '</div></div>' : '') +
+    '<div class="card section-gap"><div class="card-header"><h3>Complete Transaction History</h3></div><div class="table-scroll card-body">' +
+      (txns.length ? ('<table><thead><tr><th>Date</th><th>Type</th><th>Ref No.</th><th>Description</th><th>Debit</th><th>Credit</th><th>Balance</th></tr></thead><tbody>' +
+        '<tr style="background:var(--neutral-bg);font-weight:600;"><td colspan="6">Opening Balance</td><td>'+money(p.openingBalance)+'</td></tr>' +
+        L.rows.join('') + '</tbody></table>') : '<div class="empty-state">No transactions yet.</div>') +
+    '</div></div>' +
+    '<div class="card section-gap"><div class="card-header"><h3>Notes &amp; Activity History</h3>' +
+      '<button class="btn btn-secondary" onclick="openCustomerNoteModal_(\''+cid+'\',\''+nm+'\')">+ Add Note</button></div>' +
+      '<div class="card-body">' +
+      (act.length
+        ? '<div class="lead-timeline">'+act.map(function(x){
+            return '<div class="lt-item '+leadTlClass_(x.kind)+'"><div class="lt-time">'+esc(x.dateTime||'—')+'</div>' +
+              actHeadHtml_({ kind:x.kind, label:(x.label||'Activity'), text:x.text, detail:x.detail, tone:x.tone, mapUrl:x.mapUrl }, 'lt-tag') +
+              actBodyHtml_(x) +
+              (x.by ? '<div class="lt-by">by '+esc(x.by)+'</div>' : '') + '</div>';
+          }).join('')+'</div>'
+        : '<div class="empty-state">No activity yet. Tap “+ Add Note” to log the first one.</div>') +
+    '</div></div>';
+}
+
+// Re-fetches the open customer and repaints in place (keeps scroll position, no skeleton).
+function refreshCustomerDetailSilently_(cid){
+  google.script.run
+    .withSuccessHandler(function(res){
+      if(!res || !res.success) return;
+      CUST_DETAIL_CACHE_[cid] = res;
+      if(CUST_DETAIL_OPEN_ !== cid || !q('#custBackBtn')) return;   // user already moved on
+      const y = window.pageYOffset || 0;
+      renderCustomerDetail_(res);
+      window.scrollTo(0, y);
+    })
+    .withFailureHandler(function(){})
+    .apiEmployeeGetCustomerProfile(ETOKEN, cid);
+}
+
+function openCustomerDetail_(customerId){
+  const cid = String(customerId || '').trim();
+  // already open (note saved / contact edited / call logged / terms changed) -> refresh in place
+  if(CUST_DETAIL_OPEN_ === cid && q('#custBackBtn')){ refreshCustomerDetailSilently_(cid); return; }
+  saveCustListState_();
+  const main = q('#mainContent');
+  CUST_DETAIL_OPEN_ = cid;
+  const cached = CUST_DETAIL_CACHE_[cid];
+  if(cached){
+    renderCustomerDetail_(cached);     // instant - then refreshed quietly below
+  } else {
+    const pre = (MY_CUSTOMERS_CACHE || []).filter(function(c){ return String(c.customerId||'') === cid; })[0];
+    main.innerHTML = custBackBtn_() +
+      (pre ? '<div class="page-header"><div><h2>'+esc(pre.customerName||'')+'</h2><p>'+esc(pre.customerId||'')+'</p></div></div>' : '') +
+      '<div class="skeleton" style="height:200px"></div>';
+  }
+  window.scrollTo(0, 0);
+  google.script.run
+    .withSuccessHandler(function(res){
+      if(CUST_DETAIL_OPEN_ !== cid || !q('#custBackBtn')) return;   // user already moved on
+      if(!res || !res.success){
+        delete CUST_DETAIL_CACHE_[cid];
+        showToast((res && res.message) || 'Failed to load customer.', 'err');
+        backToMyCustomers_();
+        return;
+      }
+      CUST_DETAIL_CACHE_[cid] = res;
+      const y = cached ? (window.pageYOffset || 0) : 0;
+      renderCustomerDetail_(res);
+      window.scrollTo(0, y);
+    })
+    .withFailureHandler(onEmployeeSessionError)
+    .apiEmployeeGetCustomerProfile(ETOKEN, cid);
+}
+
+// Saved note shows in the open page instantly; the quiet refresh right after confirms it from the server.
+function custDetailNoteLocal_(customerId, text, res){
+  const cid = String(customerId || '').trim();
+  const cached = CUST_DETAIL_CACHE_[cid];
+  if(!cached || CUST_DETAIL_OPEN_ !== cid || !q('#custBackBtn')) return;
+  cached.activity = cached.activity || [];
+  cached.activity.unshift({ kind:'NOTE_ADDED', label:'📝 Note Added', text:text, by:(EMP_NAME||''), dateTime:((res && res.dateTime) || ''), t:Date.now() });
+  const y = window.pageYOffset || 0;
+  renderCustomerDetail_(cached);
+  window.scrollTo(0, y);
+}
+
 /* ---- NEW: collapsible Log Visit entry in the customer Notes & Activity timeline ---- */
 
 // Splits the entry text into "detail" (distance / location link) and "notes".
@@ -3047,6 +3254,7 @@ function saveCustomerNote_(customerId){
       btn.disabled=false; btn.textContent='Save Note';
       if(res && res.success){
         showToast('Note added.', 'ok'); closeModal();
+        custDetailNoteLocal_(customerId, text, res);   // NEW: appears instantly
         openCustomerProfile(customerId);
       } else { showToast((res && res.message) || 'Failed to add note.', 'err'); }
     })
