@@ -4171,25 +4171,27 @@ function fmtOrderCd_(type, val){
 // NEW: single source of truth for the order WhatsApp message
 // (used by the Order Created popup AND the Orders tab)
 function buildOrderWhatsAppMsg_(o){
-  const DIV = '━━━━━━━━━━━━━━━━━━━━';
+  const DIV = '━━━━━━━━━━━━';
   const label = (o.orderFor === 'Lead' || o.entityType === 'lead') ? 'Lead' : 'Customer';
-  const name = String(o.customerName || '').trim();
-  const area = String(o.customerArea || '').trim();
+  const name = String(o.customerName || '').replace(/\*/g, '').trim();
+  const area = String(o.customerArea || '').replace(/\*/g, '').trim();
   const mobile = String(o.customerMobile || '').trim();
   const ll = String(o.customerLatLong || '').replace(/\s+/g, '');   // spaces would break the link
 
-  let msg = 'ORDER DETAILS\n' + DIV + '\n\n';
-  msg += label + ': ' + name + (area ? ',' + area : '') + '\n';
+   const showMoney = !!o.cash || !!fmtOrderCd_(o.cdType, o.cdValue);
+  let msg = 'ORDER DETAILS' + (showMoney ? ' 💰💰💰' : '') + '\n' + DIV + '\n';
+  msg += '*' + label + ': ' + name + (area ? ',' + area : '') + '*\n';
   if(mobile) msg += 'Mobile No.: ' + mobile + '\n';
   if(ll) msg += 'Location: https://maps.google.com/?q=' + ll + '\n';
-  if(o.cash) msg += 'Payment: Cash\n';                                                          // CASH/CD
+  if(o.cash) msg += '*Payment: Cash*\n';                                                        // CASH/CD
   const cd = fmtOrderCd_(o.cdType, o.cdValue);                                                  // CASH/CD
-  if(cd) msg += 'Cash Discount: ' + cd + '\n';                                                  // CASH/CD
+  if(cd) msg += '*Cash Discount: ' + cd + '*\n';                                                // CASH/CD
 
-  msg += '\nORDER ITEMS\n' + DIV + '\n\n';
+  msg += '\nORDER ITEMS\n' + DIV + '\n';
   msg += (o.items || []).map(function(it, i){
     const remark = String(it.remark || '').trim() || '—';
-    return (i+1) + '. ' + it.productName + '\n   Qty: ' + it.quantity + '\n   Remark: ' + remark;
+    const pname = String(it.productName || '').replace(/\*/g, '').trim();
+    return (i+1) + '. *' + pname + '*\n   Qty: ' + it.quantity + '\n   Remark: ' + remark;
   }).join('\n\n');
   return msg;
 }
