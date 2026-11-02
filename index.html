@@ -252,6 +252,16 @@
     .modal-close{border:none;background:var(--neutral-bg);width:28px;height:28px;border-radius:50%;}
     .modal-body{padding:18px 20px;flex:1 1 auto;overflow-y:auto;min-height:0;}
     .modal-actions{display:flex;gap:10px;padding:14px 20px;flex:0 0 auto;border-top:1px solid var(--border);}
+        /* NEW: Create Order - Cash / CD row */
+    .ord-opts{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:6px;}
+    .ord-opts .btn{margin:0;padding:9px 14px;}
+    .ord-cash{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;cursor:pointer;user-select:none;padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:#fff;}
+    .ord-cash input{width:16px;height:16px;margin:0;accent-color:var(--primary-accent);cursor:pointer;}
+    .ord-cd{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;}
+    .ord-cd-box{display:inline-flex;align-items:stretch;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:#fff;overflow:hidden;}
+    .ord-cd-sym{border:none;border-right:1.5px solid var(--border);background:var(--primary-light);color:var(--primary-accent);font-weight:800;font-size:14px;min-width:34px;padding:0 8px;cursor:pointer;}
+    .ord-cd-sym:active{transform:scale(.94);}
+    .ord-cd-box input{border:none;outline:none;width:80px;padding:8px;font-size:13px;}
 
     .profile-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:14px;}
     .profile-item{background:var(--neutral-bg);border-radius:var(--radius-sm);padding:10px 14px;}
@@ -1401,7 +1411,7 @@ function paintMyLeads_(){
           '<button class="icon-btn" title="Edit Lead" onclick="openLeadEditModal_(\''+lid+'\')">✏️</button> ' +
           '<button class="icon-btn add-visit" title="Add Note" onclick="openLeadNoteModal_(\''+lid+'\',\''+esc(l.name||'')+'\')">+</button> ' +
           leadLocationBtn_(l) + ' ' +
-          '<button class="icon-btn" title="Create Order" onclick="event.stopPropagation();openCreateOrderModal_(\''+lid+'\',\''+esc(l.name||'')+'\',\''+esc(l.address||'')+'\',\''+esc(l.latLong||'')+'\',\''+esc(l.phoneNo||'')+'\',\'lead\')">📦+</button> ' +
+          '<button class="icon-btn" title="Create Order" onclick="event.stopPropagation();openCreateOrderModal_(\''+lid+'\',\''+esc(l.name||'')+'\',\''+esc(l.address||'')+'\',\''+esc(l.latLong||'')+'\',\''+esc(l.phoneNo||'')+'\',\'lead\',\''+esc(l.area||'')+'\')">📦+</button> ' +
           '<button class="icon-btn" title="WhatsApp" onclick="event.stopPropagation();openWaMenu_(this,\'lead\',\''+lid+'\')">💬</button>' +
         '</td>' +
         '<td>'+esc(l.area||'—')+'</td>' +
@@ -2813,7 +2823,7 @@ function paintMyCustomers_(){
     return '<button class="icon-btn" title="Call" onclick="event.stopPropagation();callCustomer_(\''+esc(c.mobile||'')+'\')">📞</button> ' +
       locationBtn + ' ' +
       '<button class="icon-btn add-visit" title="Add Visit" onclick="event.stopPropagation();openAddVisitModal(\''+cid+'\',\''+esc(c.customerName)+'\')">+</button> ' +
-      '<button class="icon-btn" title="Create Order" onclick="event.stopPropagation();openCreateOrderModal_(\''+cid+'\',\''+esc(c.customerName)+'\',\''+esc(c.address||'')+'\',\''+esc(c.latLong||'')+'\',\''+esc(c.mobile||'')+'\')">📦+</button> ' +
+      '<button class="icon-btn" title="Create Order" onclick="event.stopPropagation();openCreateOrderModal_(\''+cid+'\',\''+esc(c.customerName)+'\',\''+esc(c.address||'')+'\',\''+esc(c.latLong||'')+'\',\''+esc(c.mobile||'')+'\',\'\',\''+esc(c.area||'')+'\')">📦+</button> ' +
       '<button class="icon-btn" title="WhatsApp" onclick="event.stopPropagation();openWaMenu_(this,\'customer\',\''+cid+'\')">💬</button>';
   };
   // Desktop table (unchanged) - hidden on mobile via CSS.
@@ -4023,6 +4033,7 @@ function doCheckOut_(){
 let MY_ORDERS_CACHE = [];
 let ORDER_ITEM_ROWS_ = [];
 let LAST_CREATED_ORDER_ = null;
+let ORDER_CD_TYPE_ = '%';   // NEW - current CD mode in the Create Order modal
 
 let ORDERS_LOADED_ = false; // NEW
 
@@ -4146,40 +4157,53 @@ function markOrderItemDelivered_(orderId, orderItemId){
 function shareEmployeeOrderWhatsApp_(orderId){
   const o = MY_ORDERS_CACHE.find(function(x){ return x.orderId===orderId; });
   if(!o) return;
-  const DIV = '━━━━━━━━━━━━━━━━';
-  let mapsLink = '';
-  if(o.customerLatLong){
-    mapsLink = 'https://maps.google.com/?q=' + o.customerLatLong.trim();
-  }
-
-  let msg = 'Dear Team,\n*A NEW ORDER HAS BEEN GENERATED*\n\n';
-
-  msg += '*ORDER DETAILS*\n' + DIV + '\n';
-  msg += '*Order No.:* ' + o.orderNo + '\n';
-  msg += (o.orderFor === 'Lead' ? '*Lead:* ' : '*Customer:* ') + o.customerName + '\n';
-  if(o.customerMobile) msg += '*Mobile No.:* ' + o.customerMobile + '\n';
-  if(o.customerAddress) msg += '*Address:* ' + o.customerAddress + '\n';
-  if(mapsLink) msg += '*Location:* ' + mapsLink + '\n';
-  msg += '*Order Date:* ' + o.orderDate + '\n';
-  msg += '*Created By:* ' + o.employeeName + '\n\n';
-
-  msg += '*ORDER ITEMS*\n' + DIV + '\n';
-  msg += o.items.map(function(it,i){
-    let line = (i+1) + '. *' + it.productName + '*\n   Qty: ' + it.quantity;
-    if(it.remark) line += '\n   Remark: ' + it.remark;
-    return line;
-  }).join('\n\n');
-  msg += '\n\n';
-
-  msg += '*ORDER NOTES*\n' + DIV + '\n';
-  msg += (o.notes || 'No additional notes.') + '\n\n';
-
-  msg += 'Please process the order accordingly.\nThank you.';
+  const msg = buildOrderWhatsAppMsg_(o);
   window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
 }
 
-function openCreateOrderModal_(customerId, customerName, customerAddress, customerLatLong, customerMobile, entityType){
+// NEW: formats CD as "5%" or "₹200"; '' when no CD
+function fmtOrderCd_(type, val){
+  const v = Number(val);
+  if(!(v > 0)) return '';
+  return type === '₹' ? ('₹' + v) : (v + '%');
+}
+
+// NEW: single source of truth for the order WhatsApp message
+// (used by the Order Created popup AND the Orders tab)
+function buildOrderWhatsAppMsg_(o){
+  const DIV = '━━━━━━━━━━━━━━━━━━━━';
+  const label = (o.orderFor === 'Lead' || o.entityType === 'lead') ? 'Lead' : 'Customer';
+  const name = String(o.customerName || '').trim();
+  const area = String(o.customerArea || '').trim();
+  const mobile = String(o.customerMobile || '').trim();
+  const ll = String(o.customerLatLong || '').replace(/\s+/g, '');   // spaces would break the link
+
+  let msg = 'ORDER DETAILS\n' + DIV + '\n\n';
+  msg += label + ': ' + name + (area ? ',' + area : '') + '\n';
+  if(mobile) msg += 'Mobile No.: ' + mobile + '\n';
+  if(ll) msg += 'Location: https://maps.google.com/?q=' + ll + '\n';
+  if(o.cash) msg += 'Payment: Cash\n';                                                          // CASH/CD
+  const cd = fmtOrderCd_(o.cdType, o.cdValue);                                                  // CASH/CD
+  if(cd) msg += 'Cash Discount: ' + cd + '\n';                                                  // CASH/CD
+
+  msg += '\nORDER ITEMS\n' + DIV + '\n\n';
+  msg += (o.items || []).map(function(it, i){
+    const remark = String(it.remark || '').trim() || '—';
+    return (i+1) + '. ' + it.productName + '\n   Qty: ' + it.quantity + '\n   Remark: ' + remark;
+  }).join('\n\n');
+  return msg;
+}
+
+// NEW: CD % <-> ₹ toggle (works repeatedly, modal is never re-rendered)
+function toggleOrderCdType_(){
+  ORDER_CD_TYPE_ = (ORDER_CD_TYPE_ === '%') ? '₹' : '%';
+  const b = q('#orderCdToggle');
+  if(b) b.textContent = ORDER_CD_TYPE_;
+}
+
+function openCreateOrderModal_(customerId, customerName, customerAddress, customerLatLong, customerMobile, entityType, customerArea){
   ORDER_ITEM_ROWS_ = [{ productName:'', quantity:'', remark:'' }];
+  ORDER_CD_TYPE_ = '%';
   q('#modalHost').innerHTML =
     '<div class="modal-overlay" onclick="if(event.target===this) closeModal()"><div class="modal">' +
       '<div class="modal-head"><h3>Create New Order</h3><button class="modal-close" onclick="closeModal()">&times;</button></div>' +
@@ -4188,9 +4212,16 @@ function openCreateOrderModal_(customerId, customerName, customerAddress, custom
         '<div class="field"><label>Order Date</label><input type="text" value="'+new Date().toLocaleString()+'" disabled></div>' +
         '<label style="font-size:13px;font-weight:600;display:block;margin:10px 0 6px;">Products</label>' +
         '<div id="orderItemRows"></div>' +
-        '<button class="btn btn-ghost" style="margin-top:6px;" onclick="addOrderItemRow_()">+ Add Product</button>' +
+    '<div class="ord-opts">' +
+          '<button class="btn btn-ghost" onclick="addOrderItemRow_()">+ Add Product</button>' +
+          '<label class="ord-cash"><input type="checkbox" id="orderCash"> Cash</label>' +
+          '<div class="ord-cd"><span>CD</span><div class="ord-cd-box">' +
+            '<button type="button" class="ord-cd-sym" id="orderCdToggle" title="Tap to switch between % and ₹" onclick="toggleOrderCdType_()">%</button>' +
+            '<input type="number" id="orderCdVal" min="0" step="any" inputmode="decimal" placeholder="0">' +
+          '</div></div>' +
+        '</div>' +
       '</div>' +
-      '<div class="modal-actions"><button class="btn btn-primary" id="orderSaveBtn" onclick="saveOrder_(\''+esc(customerId)+'\',\''+esc(customerName)+'\',\''+esc(customerAddress||'')+'\',\''+esc(customerLatLong||'')+'\',\''+esc(customerMobile||'')+'\',\''+(entityType === 'lead' ? 'lead' : '')+'\')">Create Order</button><button class="btn btn-ghost" onclick="closeModal()">Cancel</button></div>' +
+      '<div class="modal-actions"><button class="btn btn-primary" id="orderSaveBtn" onclick="saveOrder_(\''+esc(customerId)+'\',\''+esc(customerName)+'\',\''+esc(customerAddress||'')+'\',\''+esc(customerLatLong||'')+'\',\''+esc(customerMobile||'')+'\',\''+(entityType === 'lead' ? 'lead' : '')+'\',\''+esc(customerArea||'')+'\')">Create Order</button><button class="btn btn-ghost" onclick="closeModal()">Cancel</button></div>' +
     '</div></div>';
   paintOrderItemRows_();
 }
@@ -4220,11 +4251,17 @@ function removeOrderItemRow_(idx){
   paintOrderItemRows_();
 }
 
-function saveOrder_(customerId, customerName, customerAddress, customerLatLong, customerMobile, entityType){
+function saveOrder_(customerId, customerName, customerAddress, customerLatLong, customerMobile, entityType, customerArea){
   const items = ORDER_ITEM_ROWS_
     .map(function(r){ return { productName: (r.productName||'').trim(), quantity: Number(r.quantity)||0, remark: (r.remark||'').trim() }; })
     .filter(function(r){ return r.productName && r.quantity>0; });
   if(!items.length){ showToast('Add at least one product with a quantity.', 'err'); return; }
+    // NEW: Cash + CD
+  const cdRaw = q('#orderCdVal') ? String(q('#orderCdVal').value).trim() : '';
+  const cdNum = cdRaw === '' ? 0 : Number(cdRaw);
+  if(isNaN(cdNum) || cdNum < 0){ showToast('Enter a valid CD value.', 'err'); return; }
+  if(ORDER_CD_TYPE_ === '%' && cdNum > 100){ showToast('CD % cannot be more than 100.', 'err'); return; }
+  const payment = { cash: !!(q('#orderCash') && q('#orderCash').checked), cdType: ORDER_CD_TYPE_, cdValue: cdNum };
   const btn = q('#orderSaveBtn'); btn.disabled=true; btn.textContent='Creating...';
   google.script.run
     .withSuccessHandler(function(res){
@@ -4234,18 +4271,18 @@ function saveOrder_(customerId, customerName, customerAddress, customerLatLong, 
         if(entityType === 'lead'){ delete LEAD_DETAIL_CACHE_[customerId]; refreshMyLeadsSilently_(); }   // NEW - lead's Last Activity updates
         else refreshMyCustomersSilently_();
         if(q('#ordersList')) loadMyOrders_();
-        showOrderCreatedModal_(res.orderNo, customerName, items, customerAddress, customerLatLong, customerMobile, entityType);
+       showOrderCreatedModal_(res.orderNo, customerName, items, customerAddress, customerLatLong, customerMobile, entityType, customerArea, payment);
       }
       else { showToast((res && res.message) || 'Failed to create order.', 'err'); }
     })
     .withFailureHandler(function(){ btn.disabled=false; btn.textContent='Create Order'; showToast('Failed to create order.', 'err'); })
-    .apiEmployeeCreateOrder(ETOKEN, customerId, items, entityType || '');
+     .apiEmployeeCreateOrder(ETOKEN, customerId, items, entityType || '', payment);
 }
 
 // NEW: keeps the flow inside the same popup - shows what was just
 // created plus a WhatsApp button, so no trip to the Orders page needed.
-function showOrderCreatedModal_(orderNo, customerName, items, customerAddress, customerLatLong, customerMobile, entityType){
-  LAST_CREATED_ORDER_ = { entityType: entityType || '', orderNo: orderNo, customerName: customerName, items: items, orderDate: new Date().toLocaleString(), customerAddress: customerAddress||'', customerLatLong: customerLatLong||'', customerMobile: customerMobile||'' };
+function showOrderCreatedModal_(orderNo, customerName, items, customerAddress, customerLatLong, customerMobile, entityType, customerArea, payment){
+  LAST_CREATED_ORDER_ = { entityType: entityType || '', orderNo: orderNo, customerName: customerName, items: items, orderDate: new Date().toLocaleString(), customerAddress: customerAddress||'', customerLatLong: customerLatLong||'', customerMobile: customerMobile||'', customerArea: customerArea||'', cash: !!(payment && payment.cash), cdType: (payment && payment.cdType) || '%', cdValue: (payment && payment.cdValue) || 0 };
   q('#modalHost').innerHTML =
     '<div class="modal-overlay" onclick="if(event.target===this) closeModal()"><div class="modal">' +
       '<div class="modal-head"><h3>Order Created</h3><button class="modal-close" onclick="closeModal()">&times;</button></div>' +
@@ -4265,25 +4302,7 @@ function showOrderCreatedModal_(orderNo, customerName, items, customerAddress, c
 function shareCreatedOrderWhatsApp_(){
   const o = LAST_CREATED_ORDER_;
   if(!o) return;
-  const DIV = '━━━━━━━━━━━━━━━━';
-  let mapsLink = '';
-  if(o.customerLatLong) mapsLink = 'https://maps.google.com/?q=' + o.customerLatLong.trim();
-  let msg = 'Dear Team,\n*A NEW ORDER HAS BEEN GENERATED*\n\n';
-  msg += '*ORDER DETAILS*\n' + DIV + '\n';
-  msg += '*Order No.:* ' + o.orderNo + '\n';
-  msg += (o.entityType === 'lead' ? '*Lead:* ' : '*Customer:* ') + o.customerName + '\n';
-  if(o.customerMobile) msg += '*Mobile No.:* ' + o.customerMobile + '\n';
-  if(o.customerAddress) msg += '*Address:* ' + o.customerAddress + '\n';
-  if(mapsLink) msg += '*Location:* ' + mapsLink + '\n';
-  msg += '*Order Date:* ' + o.orderDate + '\n';
-  msg += '*Created By:* ' + EMP_NAME + '\n\n';
-  msg += '*ORDER ITEMS*\n' + DIV + '\n';
-  msg += o.items.map(function(it,i){
-    let line = (i+1) + '. *' + it.productName + '*\n   Qty: ' + it.quantity;
-    if(it.remark) line += '\n   Remark: ' + it.remark;
-    return line;
-  }).join('\n\n');
-  msg += '\n\nPlease process the order accordingly.\nThank you.';
+  const msg = buildOrderWhatsAppMsg_(o);
   window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
 }
 
