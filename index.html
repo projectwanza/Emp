@@ -4189,9 +4189,9 @@ function buildOrderWhatsAppMsg_(o){
 
   msg += '\nORDER ITEMS\n' + DIV + '\n';
   msg += (o.items || []).map(function(it, i){
-    const remark = String(it.remark || '').trim() || '—';
+    const remark = String(it.remark == null ? '' : it.remark).trim();   // empty/null/undefined/spaces -> ''
     const pname = String(it.productName || '').replace(/\*/g, '').trim();
-    return (i+1) + '. *' + pname + '*\n   Qty: ' + it.quantity + '\n   Remark: ' + remark;
+    return (i+1) + '. *' + pname + '*\n   *Qty: ' + it.quantity + '*' + (remark ? ', ' + remark : '');
   }).join('\n\n');
   return msg;
 }
